@@ -1,0 +1,55 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# Next.js Build Outputs
+/.next/
+/out/
+/build/
+
+# Standalone Desktop & Distribution Artifacts
+/dist/
+*.exe
+*.dll
+
+# Tauri Build Outputs
+/src-tauri/target/
+
+# Environment Variables & Secrets
+.env
+.env*.local
+!.env.example
+
+# Local Runtime Data & Store Settings
+pharmacy-settings.json
+*.db
+*.sqlite
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# TypeScript
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# IDE & Editors
+.vscode/
+.idea/
+*.suo
+*.user

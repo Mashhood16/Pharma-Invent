@@ -1,0 +1,1 @@
+ALTER TABLE "batches" ADD COLUMN "retail_price_per_box" numeric(12, 2);
