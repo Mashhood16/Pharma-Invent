@@ -1,13 +1,21 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { medicines, batches, suppliers } from "@/db/schema";
-import { desc, sql, eq } from "drizzle-orm";
+import { desc, sql, eq, and } from "drizzle-orm";
 import { offlineStore } from "@/db/offline-store";
+import { resolveTenant } from "@/lib/tenant";
 
 export async function GET() {
   try {
+    const tenantRes = await resolveTenant();
+    if (!tenantRes.success) {
+      return NextResponse.json({ error: tenantRes.error }, { status: tenantRes.status });
+    }
+    const { pharmacyId } = tenantRes.tenant;
+
     try {
       const list = await db.query.medicines.findMany({
+        where: eq(medicines.pharmacyId, pharmacyId),
         orderBy: [desc(medicines.createdAt)],
         with: {
           batches: {
@@ -32,8 +40,9 @@ export async function GET() {
 
       return NextResponse.json(enriched);
     } catch {
-      // Offline mode
-      const enriched = offlineStore.medicines.map((med) => {
+      // Offline mode: scoped strictly to current pharmacy
+      const meds = offlineStore.getMedicines(pharmacyId);
+      const enriched = meds.map((med) => {
         const totalBoxes = med.batches.reduce(
           (sum, b) => sum + b.boxesInStock,
           0
@@ -53,6 +62,12 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const tenantRes = await resolveTenant();
+    if (!tenantRes.success) {
+      return NextResponse.json({ error: tenantRes.error }, { status: tenantRes.status });
+    }
+    const { pharmacyId } = tenantRes.tenant;
+
     const body = await request.json();
     const {
       brandName,
@@ -74,6 +89,7 @@ export async function POST(request: Request) {
       const [newMed] = await db
         .insert(medicines)
         .values({
+          pharmacyId,
           brandName: brandName.trim(),
           genericFormula: genericFormula.trim(),
           category: category?.trim() || "Tablets (Oral)",
@@ -108,8 +124,8 @@ export async function POST(request: Request) {
 
       return NextResponse.json(newMed);
     } catch {
-      // Offline fallback creation
-      const createdMed = offlineStore.addMedicine({
+      // Offline fallback creation scoped to pharmacy
+      const createdMed = offlineStore.addMedicine(pharmacyId, {
         brandName,
         genericFormula,
         category: category || "Tablets (Oral)",
@@ -127,6 +143,12 @@ export async function POST(request: Request) {
 // DELETE a medicine permanently
 export async function DELETE(request: Request) {
   try {
+    const tenantRes = await resolveTenant();
+    if (!tenantRes.success) {
+      return NextResponse.json({ error: tenantRes.error }, { status: tenantRes.status });
+    }
+    const { pharmacyId } = tenantRes.tenant;
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
@@ -135,14 +157,16 @@ export async function DELETE(request: Request) {
     }
 
     try {
-      await db.delete(medicines).where(eq(medicines.id, id));
+      await db
+        .delete(medicines)
+        .where(and(eq(medicines.id, id), eq(medicines.pharmacyId, pharmacyId)));
       return NextResponse.json({ success: true, message: "Medicine deleted successfully" });
     } catch {
-      const deleted = offlineStore.deleteMedicine(id);
+      const deleted = offlineStore.deleteMedicine(pharmacyId, id);
       if (deleted) {
         return NextResponse.json({ success: true, message: "Medicine deleted from local store" });
       }
-      return NextResponse.json({ error: "Medicine not found" }, { status: 404 });
+      return NextResponse.json({ error: "Medicine not found in this pharmacy" }, { status: 404 });
     }
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

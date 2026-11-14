@@ -6,13 +6,16 @@ const SECRET_KEY = new TextEncoder().encode(
   process.env.JWT_SECRET || "pharma_invent_super_secure_secret_key_2026_at_least_32_chars!"
 );
 
-export type Role = "ADMIN" | "CASHIER";
+export type Role = "SUPER_ADMIN" | "ADMIN" | "CASHIER";
 
 export interface SessionPayload {
   userId: string;
   name: string;
   username: string;
   role: Role;
+  pharmacyId?: string | null;
+  pharmacyName?: string | null;
+  activePharmacyId?: string | null;
 }
 
 export async function hashPassword(password: string): Promise<string> {

@@ -14,10 +14,12 @@ import {
   LogOut,
   Bot,
   Settings,
+  ShieldCheck,
 } from "lucide-react";
+import { Role } from "@/lib/auth";
 
 interface SidebarProps {
-  userRole?: "ADMIN" | "CASHIER";
+  userRole?: Role;
   onOpenAI?: () => void;
 }
 
@@ -40,53 +42,59 @@ export function Sidebar({
 
   const navItems = [
     {
+      label: "Super Admin Portal",
+      href: "/super-admin",
+      icon: ShieldCheck,
+      roles: ["SUPER_ADMIN"],
+    },
+    {
       label: "Point of Sale",
       href: "/pos",
       icon: ShoppingCart,
       shortcut: "F1",
-      roles: ["ADMIN", "CASHIER"],
+      roles: ["SUPER_ADMIN", "ADMIN", "CASHIER"],
     },
     {
       label: "Medicine Inventory",
       href: "/inventory",
       icon: Pill,
-      roles: ["ADMIN", "CASHIER"],
+      roles: ["SUPER_ADMIN", "ADMIN", "CASHIER"],
     },
     {
       label: "Stock In & Inflow",
       href: "/purchases",
       icon: Truck,
-      roles: ["ADMIN"],
+      roles: ["SUPER_ADMIN", "ADMIN"],
     },
     {
       label: "Expiry & RTV Returns",
       href: "/expiry",
       icon: CalendarX,
-      roles: ["ADMIN", "CASHIER"],
+      roles: ["SUPER_ADMIN", "ADMIN", "CASHIER"],
     },
     {
       label: "Customer Accounts",
       href: "/customers",
       icon: Users,
-      roles: ["ADMIN", "CASHIER"],
+      roles: ["SUPER_ADMIN", "ADMIN", "CASHIER"],
     },
     {
       label: "Suppliers & Vendors",
       href: "/suppliers",
       icon: Building2,
-      roles: ["ADMIN"],
+      roles: ["SUPER_ADMIN", "ADMIN"],
     },
     {
       label: "Financial Analytics",
       href: "/financials",
       icon: TrendingUp,
-      roles: ["ADMIN"],
+      roles: ["SUPER_ADMIN", "ADMIN"],
     },
     {
       label: "Store Settings",
       href: "/settings",
       icon: Settings,
-      roles: ["ADMIN"],
+      roles: ["SUPER_ADMIN", "ADMIN"],
     },
   ];
 
@@ -98,13 +106,14 @@ export function Sidebar({
     <aside className="w-56 bg-zinc-950 border-r border-zinc-800 flex flex-col justify-between shrink-0 select-none">
       <div className="py-2">
         <div className="px-3 py-1.5 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
-          Main Modules
+          {userRole === "SUPER_ADMIN" ? "Platform & Store" : "Main Modules"}
         </div>
 
         <nav className="space-y-0.5 px-2">
           {visibleItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
+            const isSuperAdminLink = item.href === "/super-admin";
 
             return (
               <Link
@@ -112,12 +121,26 @@ export function Sidebar({
                 href={item.href}
                 className={`flex items-center justify-between px-2.5 py-2 rounded-md text-xs font-medium transition-colors ${
                   isActive
-                    ? "bg-zinc-800 text-white font-semibold"
+                    ? isSuperAdminLink
+                      ? "bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30"
+                      : "bg-zinc-800 text-white font-semibold"
+                    : isSuperAdminLink
+                    ? "text-amber-400/90 hover:bg-amber-500/10 hover:text-amber-300"
                     : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
                 }`}
               >
                 <div className="flex items-center space-x-2">
-                  <Icon className={`w-4 h-4 ${isActive ? "text-zinc-100" : "text-zinc-500"}`} />
+                  <Icon
+                    className={`w-4 h-4 ${
+                      isActive
+                        ? isSuperAdminLink
+                          ? "text-amber-400"
+                          : "text-zinc-100"
+                        : isSuperAdminLink
+                        ? "text-amber-400"
+                        : "text-zinc-500"
+                    }`}
+                  />
                   <span>{item.label}</span>
                 </div>
 

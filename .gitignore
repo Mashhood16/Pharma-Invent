@@ -29,6 +29,7 @@
 
 # Local Runtime Data & Store Settings
 pharmacy-settings.json
+pharmacies-data.json
 *.db
 *.sqlite
 

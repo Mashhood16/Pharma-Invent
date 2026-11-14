@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { purchases, purchaseItems, suppliers, batches, medicines } from "@/db/schema";
-import { eq, gte, sql, desc } from "drizzle-orm";
-import { getCurrentUser } from "@/lib/auth";
+import { eq, gte, sql, desc, and } from "drizzle-orm";
 import { offlineStore } from "@/db/offline-store";
+import { resolveTenant } from "@/lib/tenant";
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
+    const tenantRes = await resolveTenant();
+    if (!tenantRes.success) {
+      return NextResponse.json({ error: tenantRes.error }, { status: tenantRes.status });
+    }
+    const { pharmacyId, user } = tenantRes.tenant;
+
+    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -31,11 +36,19 @@ export async function GET() {
         })
         .from(suppliers)
         .innerJoin(purchases, eq(suppliers.id, purchases.supplierId))
-        .where(gte(purchases.createdAt, startOfWeek))
+        .where(
+          and(
+            eq(purchases.pharmacyId, pharmacyId),
+            gte(purchases.createdAt, startOfWeek)
+          )
+        )
         .groupBy(suppliers.id, suppliers.name, suppliers.contactInfo, suppliers.ledgerBalance);
 
       const weeklyPurchasesList = await db.query.purchases.findMany({
-        where: gte(purchases.createdAt, startOfWeek),
+        where: and(
+          eq(purchases.pharmacyId, pharmacyId),
+          gte(purchases.createdAt, startOfWeek)
+        ),
         orderBy: [desc(purchases.createdAt)],
         with: {
           supplier: true,
@@ -63,11 +76,12 @@ export async function GET() {
         weeklyPurchasesList,
       });
     } catch {
-      // Offline mode - clean calculations
-      const totalSpent = offlineStore.purchases.reduce((sum, p) => sum + p.totalCost, 0);
+      // Offline mode scoped to pharmacy
+      const pharmPurchases = offlineStore.getPurchases(pharmacyId);
+      const totalSpent = pharmPurchases.reduce((sum, p) => sum + p.totalCost, 0);
       const supplierInflowMap: Record<string, any> = {};
 
-      for (const p of offlineStore.purchases) {
+      for (const p of pharmPurchases) {
         if (!supplierInflowMap[p.supplierId]) {
           supplierInflowMap[p.supplierId] = {
             supplierId: p.supplierId,
@@ -86,7 +100,7 @@ export async function GET() {
         startOfWeek: new Date().toISOString(),
         totalMoneySpentThisWeek: totalSpent,
         supplierInflow: Object.values(supplierInflowMap),
-        weeklyPurchasesList: offlineStore.purchases,
+        weeklyPurchasesList: pharmPurchases,
       });
     }
   } catch (error: any) {
@@ -97,8 +111,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
+    const tenantRes = await resolveTenant();
+    if (!tenantRes.success) {
+      return NextResponse.json({ error: tenantRes.error }, { status: tenantRes.status });
+    }
+    const { pharmacyId, user } = tenantRes.tenant;
+
+    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -116,6 +135,7 @@ export async function POST(request: Request) {
       const [newPurchase] = await db
         .insert(purchases)
         .values({
+          pharmacyId,
           supplierId,
           invoiceNumber: invoiceNumber || null,
           totalCost: (totalCost || 0).toString(),
@@ -125,8 +145,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json(newPurchase);
     } catch {
-      // Offline fallback
-      const purchase = offlineStore.addPurchase({
+      const purchase = offlineStore.addPurchase(pharmacyId, {
         supplierId,
         invoiceNumber,
         totalCost: Number(totalCost) || 0,

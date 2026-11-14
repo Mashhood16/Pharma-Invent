@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { customers } from "@/db/schema";
-import { ilike, or, desc } from "drizzle-orm";
+import { ilike, or, desc, eq, and } from "drizzle-orm";
 import { offlineStore } from "@/db/offline-store";
+import { resolveTenant } from "@/lib/tenant";
 
 export async function GET(request: Request) {
   try {
+    const tenantRes = await resolveTenant();
+    if (!tenantRes.success) {
+      return NextResponse.json({ error: tenantRes.error }, { status: tenantRes.status });
+    }
+    const { pharmacyId } = tenantRes.tenant;
+
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q")?.trim() || "";
 
@@ -14,6 +21,7 @@ export async function GET(request: Request) {
         const list = await db
           .select()
           .from(customers)
+          .where(eq(customers.pharmacyId, pharmacyId))
           .orderBy(desc(customers.updatedAt))
           .limit(30);
         return NextResponse.json(list);
@@ -23,19 +31,23 @@ export async function GET(request: Request) {
         .select()
         .from(customers)
         .where(
-          or(
-            ilike(customers.name, `%${query}%`),
-            ilike(customers.phone, `%${query}%`)
+          and(
+            eq(customers.pharmacyId, pharmacyId),
+            or(
+              ilike(customers.name, `%${query}%`),
+              ilike(customers.phone, `%${query}%`)
+            )
           )
         )
         .limit(20);
 
       return NextResponse.json(list);
     } catch {
-      // Offline fallback
-      if (!query) return NextResponse.json(offlineStore.customers);
+      // Offline fallback scoped to pharmacy
+      const list = offlineStore.getCustomers(pharmacyId);
+      if (!query) return NextResponse.json(list);
       const q = query.toLowerCase();
-      const filtered = offlineStore.customers.filter(
+      const filtered = list.filter(
         (c) => c.name.toLowerCase().includes(q) || c.phone.includes(q)
       );
       return NextResponse.json(filtered);
@@ -47,6 +59,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const tenantRes = await resolveTenant();
+    if (!tenantRes.success) {
+      return NextResponse.json({ error: tenantRes.error }, { status: tenantRes.status });
+    }
+    const { pharmacyId } = tenantRes.tenant;
+
     const { name, phone, initialCredit } = await request.json();
 
     if (!name || !phone) {
@@ -60,6 +78,7 @@ export async function POST(request: Request) {
       const [newCustomer] = await db
         .insert(customers)
         .values({
+          pharmacyId,
           name: name.trim(),
           phone: phone.trim(),
           pendingCredit: (initialCredit || 0).toString(),
@@ -68,15 +87,11 @@ export async function POST(request: Request) {
 
       return NextResponse.json(newCustomer);
     } catch {
-      // Offline fallback
-      const newCust = {
-        id: `cust-${Date.now()}`,
-        name: name.trim(),
-        phone: phone.trim(),
+      const newCust = offlineStore.addCustomer(pharmacyId, {
+        name,
+        phone,
         pendingCredit: parseFloat(initialCredit) || 0,
-        updatedAt: new Date().toISOString(),
-      };
-      offlineStore.customers.unshift(newCust);
+      });
       return NextResponse.json(newCust);
     }
   } catch (error: any) {

@@ -7,14 +7,18 @@ import {
   X,
   Maximize2,
   Shield,
+  ShieldAlert,
   User as UserIcon,
   Bot,
+  Building,
 } from "lucide-react";
+import { Role } from "@/lib/auth";
 
 interface TitlebarProps {
   user?: {
     name: string;
-    role: "ADMIN" | "CASHIER";
+    role: Role;
+    pharmacyName?: string | null;
   } | null;
   onToggleAI?: () => void;
 }
@@ -57,10 +61,19 @@ export function DesktopTitlebar({ user, onToggleAI }: TitlebarProps) {
           ✚
         </div>
         <span className="font-semibold text-zinc-100 tracking-tight">
-          Pharma Invent <span className="text-zinc-500 font-normal text-[10px]">POS & Inventory</span>
+          Pharma Invent{" "}
+          <span className="text-zinc-500 font-normal text-[10px]">POS & Multi-Tenant</span>
         </span>
-        <div className="h-3 w-[1px] bg-zinc-800 mx-1" />
-        <span className="text-zinc-400">Terminal 01</span>
+
+        {user?.pharmacyName && (
+          <>
+            <div className="h-3 w-[1px] bg-zinc-800 mx-1" />
+            <span className="text-zinc-300 font-medium flex items-center gap-1">
+              <Building className="w-3 h-3 text-zinc-500" />
+              {user.pharmacyName}
+            </span>
+          </>
+        )}
       </div>
 
       {/* Center: System Status */}
@@ -88,15 +101,23 @@ export function DesktopTitlebar({ user, onToggleAI }: TitlebarProps) {
 
         {user && (
           <div className="flex items-center space-x-1.5 px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800">
-            {user.role === "ADMIN" ? (
+            {user.role === "SUPER_ADMIN" ? (
+              <ShieldAlert className="w-3 h-3 text-amber-400" />
+            ) : user.role === "ADMIN" ? (
               <Shield className="w-3 h-3 text-zinc-400" />
             ) : (
               <UserIcon className="w-3 h-3 text-zinc-400" />
             )}
-            <span className="font-medium text-zinc-200 truncate max-w-[100px]">
+            <span className="font-medium text-zinc-200 truncate max-w-[120px]">
               {user.name.split(" ")[0]}
             </span>
-            <span className="text-[9px] px-1 py-0.2 rounded font-semibold bg-zinc-800 text-zinc-300">
+            <span
+              className={`text-[9px] px-1 py-0.2 rounded font-semibold ${
+                user.role === "SUPER_ADMIN"
+                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                  : "bg-zinc-800 text-zinc-300"
+              }`}
+            >
               {user.role}
             </span>
           </div>

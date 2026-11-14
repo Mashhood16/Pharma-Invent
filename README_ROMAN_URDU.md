@@ -7,19 +7,20 @@
 
 ## 📑 Fehris (Table of Contents)
 1. [Software Ko Start / Open Kaise Karein?](#1-software-ko-start--open-kaise-karein)
-2. [Login Credentials (Username aur Password)](#2-login-credentials)
-3. [Nayi Medicine Add Karna (Inventory Management)](#3-nayi-medicine-add-karna-inventory-management)
-4. [Excel Sheet Ke Zariye Bulk Stock Upload Karna](#4-excel-sheet-ke-zariye-bulk-stock-upload-karna)
-5. [Point of Sale (POS) aur Fast Checkout](#5-point-of-sale-pos-aur-fast-checkout)
-6. [Discount Lagane Ka Tareeqa (Rupees ya Percentage)](#6-discount-lagane-ka-tareeqa-rupees-ya-percentage)
-7. [Customer Khata (Udhaar) aur Cash Wasooli](#7-customer-khata-udhaar-aur-cash-wasooli)
-8. [Distributor / Supplier Payouts (Khareedari Ka Hisaab)](#8-distributor--supplier-payouts-khareedari-ka-hisaab)
-9. [Expiry Tracking aur RTV (Return to Vendor)](#9-expiry-tracking-aur-rtv-return-to-vendor)
-10. [Day-End Z-Report (Rozana Galla / Cash Drawer Closing)](#10-day-end-z-report-rozana-galla--cash-drawer-closing)
-11. [Reorder Sheet (Low Stock WhatsApp Par Order Karna)](#11-reorder-sheet-low-stock-whatsapp-par-order-karna)
-12. [Store Settings aur Apni Pharmacy Ka Naam Print Karna](#12-store-settings-aur-apni-pharmacy-ka-naam-print-karna)
-13. [Ghalat Sale Transaction Ko Cancel / Delete Karna](#13-ghalat-sale-transaction-ko-cancel--delete-karna)
-14. [Keyboard Shortcuts Ki Mukammal List](#14-keyboard-shortcuts-ki-mukammal-list)
+2. [Login Credentials (Super Admin vs Pharmacy Accounts)](#2-login-credentials)
+3. [Super Admin Portal: Nayi Pharmacy Banana aur Manage Karna](#3-super-admin-portal-nayi-pharmacy-banana-aur-manage-karna)
+4. [Nayi Medicine Add Karna (Inventory Management)](#4-nayi-medicine-add-karna-inventory-management)
+5. [Excel Sheet Ke Zariye Bulk Stock Upload Karna](#5-excel-sheet-ke-zariye-bulk-stock-upload-karna)
+6. [Point of Sale (POS) aur Fast Checkout](#6-point-of-sale-pos-aur-fast-checkout)
+7. [Discount Lagane Ka Tareeqa (Rupees ya Percentage)](#7-discount-lagane-ka-tareeqa-rupees-ya-percentage)
+8. [Customer Khata (Udhaar) aur Cash Wasooli](#8-customer-khata-udhaar-aur-cash-wasooli)
+9. [Distributor / Supplier Payouts (Khareedari Ka Hisaab)](#9-distributor--supplier-payouts-khareedari-ka-hisaab)
+10. [Expiry Tracking aur RTV (Return to Vendor)](#10-expiry-tracking-aur-rtv-return-to-vendor)
+11. [Day-End Z-Report (Rozana Galla / Cash Drawer Closing)](#11-day-end-z-report-rozana-galla--cash-drawer-closing)
+12. [Reorder Sheet (Low Stock WhatsApp Par Order Karna)](#12-reorder-sheet-low-stock-whatsapp-par-order-karna)
+13. [Store Settings aur Apni Pharmacy Ka Naam Print Karna](#13-store-settings-aur-apni-pharmacy-ka-naam-print-karna)
+14. [Ghalat Sale Transaction Ko Cancel / Delete Karna](#14-ghalat-sale-transaction-ko-cancel--delete-karna)
+15. [Keyboard Shortcuts Ki Mukammal List](#15-keyboard-shortcuts-ki-mukammal-list)
 
 ---
 
@@ -40,14 +41,39 @@ Aapko koi command prompt ya terminal kholne ki zaroorat nahi hai. Yeh mukammal W
 
 ## 2. Login Credentials
 
-Jab software khule ga, Login screen par yeh details enter karein:
-* **Username:** `admin`
-* **Password:** `admin123`
-* Phir **"Sign In to Terminal"** button dabayein.
+Pharma Invent ab **Multi-Tenant (Multi-Pharmacy)** architecture par chalta hai:
+
+### A. Super Admin (Aap Ka Master Account)
+* **Username:** `superadmin`
+* **Password:** `superadmin123`
+* **Kiya Kar Sakta Hai:** Super Admin tamam pharmacies ko dekh sakta hai, nayi pharmacies create kar sakta hai, aur kisi bhi pharmacy ke andar ja kar uska pura stock, POS aur financials inspect kar sakta hai.
+
+### B. Client Pharmacy Account (Har Pharmacy Ka Apna Alag Account)
+* **Default Admin:** `admin` | **Password:** `admin123` (Al-Shifa Community Pharmacy)
+* **Default Cashier:** `cashier` | **Password:** `cashier123`
+* **Nayi Pharmacies:** Super Admin Portal se create kiye gaye naye usernames aur passwords.
+* **Data Security (Isolation):** Kisi bhi pharmacy ko doosri pharmacy ka data, stock, ya hisaab nazar nahi aayega.
 
 ---
 
-## 3. Nayi Medicine Add Karna (Inventory Management)
+## 3. Super Admin Portal: Nayi Pharmacy Banana aur Manage Karna
+
+1. `superadmin` username aur `superadmin123` password se login karein.
+2. Aap direct **Super Admin Control Center** (`/super-admin`) par pohanch jayenge.
+3. **Nayi Pharmacy Register Karna:**
+   - Upar **"+ Register New Pharmacy"** button dabayein.
+   - Pharmacy Name (e.g. *Al-Madina Medical Store*), Drug Sale License # (DSL), NTN, In-charge Name, Phone aur Address likhein.
+   - Us pharmacy ke malik ke liye **Admin Username** (e.g. `almadina`) aur **Password** (e.g. `almadina123`) set karein.
+   - **"Create Pharmacy Account"** dabayein. Foran naya account tayyar ho jaye ga!
+4. **Kisi Bhi Pharmacy Ka Data Dekhna (Inspect / Switch Store):**
+   - Jis pharmacy ka data dekhna ho, uske card par **"Open / Inspect Store"** dabayein.
+   - Aap foran us pharmacy ke environment mein pohanch jayenge.
+   - Screen ke upar aik gold banner nazar aayega: `[👑 Super Admin Mode: Viewing Al-Madina Pharmacy]`.
+   - Wahan se aap **"Switch Store"** dropdown se direct kisi doosri pharmacy me ja sakte hain ya **"Exit to Portal"** daba kar wapas Super Admin dashboard par aa sakte hain.
+
+---
+
+## 4. Nayi Medicine Add Karna (Inventory Management)
 
 Left side ke menu se **"Medicine Inventory"** par click karein.
 

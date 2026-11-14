@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { sales, saleItems, batches, medicines, customers } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
-import { getCurrentUser } from "@/lib/auth";
+import { eq, sql, and } from "drizzle-orm";
 import { z } from "zod";
 import { offlineStore } from "@/db/offline-store";
+import { resolveTenant } from "@/lib/tenant";
 
 const checkoutSchema = z.object({
   customerId: z.string().nullable().optional(),
@@ -23,10 +23,11 @@ const checkoutSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const tenantRes = await resolveTenant();
+    if (!tenantRes.success) {
+      return NextResponse.json({ error: tenantRes.error }, { status: tenantRes.status });
     }
+    const { pharmacyId, user } = tenantRes.tenant;
 
     const body = await request.json();
     const validation = checkoutSchema.safeParse(body);
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
     const { customerId, paymentMethod, discount, items } = validation.data;
 
     try {
-      // 1. Try PostgreSQL ACID Transaction
+      // 1. Try PostgreSQL ACID Transaction scoped to pharmacy
       const result = await db.transaction(async (tx) => {
         let calculatedTotalAmount = 0;
         let calculatedTotalProfit = 0;
@@ -70,41 +71,38 @@ export async function POST(request: Request) {
             })
             .from(batches)
             .innerJoin(medicines, eq(batches.medicineId, medicines.id))
-            .where(eq(batches.id, item.batchId))
-            .for("update");
+            .where(and(eq(batches.id, item.batchId), eq(medicines.pharmacyId, pharmacyId)))
+            .limit(1);
 
           if (!batch) {
-            throw new Error(`Batch ID ${item.batchId} not found in inventory.`);
+            throw new Error(`Batch ID ${item.batchId} not found in this pharmacy.`);
           }
 
           const currentBoxes = parseFloat(batch.boxesInStock);
-          const unitsPerBox = batch.unitsPerBox || 1;
-          const boxesNeeded = item.quantitySoldUnits / unitsPerBox;
+          const boxesNeeded = item.quantitySoldUnits / batch.unitsPerBox;
 
           if (boxesNeeded > currentBoxes + 0.0001) {
             throw new Error(
-              `Insufficient stock for ${batch.medicineBrandName} (Batch ${batch.batchNumber}). Requested: ${item.quantitySoldUnits} units, available: ${currentBoxes.toFixed(2)} boxes.`
+              `Insufficient stock for ${batch.medicineBrandName} (Batch ${batch.batchNumber}). Requested: ${item.quantitySoldUnits} units, but only ${currentBoxes.toFixed(2)} boxes remain.`
             );
           }
 
-          const newBoxesInStock = Math.max(0, currentBoxes - boxesNeeded);
-          const costPerBox = parseFloat(batch.buyPricePerBox);
-          const costPerUnit = costPerBox / unitsPerBox;
-          const subtotal = item.quantitySoldUnits * item.unitPrice;
-          const itemProfit = (item.unitPrice - costPerUnit) * item.quantitySoldUnits;
+          const lineTotal = item.quantitySoldUnits * item.unitPrice;
+          const unitCost = parseFloat(batch.buyPricePerBox) / batch.unitsPerBox;
+          const lineProfit = (item.unitPrice - unitCost) * item.quantitySoldUnits;
 
-          calculatedTotalAmount += subtotal;
-          calculatedTotalProfit += itemProfit;
+          calculatedTotalAmount += lineTotal;
+          calculatedTotalProfit += lineProfit;
 
           preparedItems.push({
-            batchId: batch.id,
+            batchId: item.batchId,
             brandName: batch.medicineBrandName,
             batchNumber: batch.batchNumber,
             quantitySoldUnits: item.quantitySoldUnits,
             unitPrice: item.unitPrice.toFixed(2),
-            subtotal: subtotal.toFixed(2),
-            profitMargin: itemProfit.toFixed(2),
-            newStock: newBoxesInStock.toFixed(4),
+            subtotal: lineTotal.toFixed(2),
+            profitMargin: lineProfit.toFixed(2),
+            newStock: Math.max(0, currentBoxes - boxesNeeded).toFixed(4),
           });
         }
 
@@ -128,6 +126,7 @@ export async function POST(request: Request) {
         const [saleRecord] = await tx
           .insert(sales)
           .values({
+            pharmacyId,
             receiptNumber,
             userId: user.userId,
             customerId: customerId || null,
@@ -156,7 +155,7 @@ export async function POST(request: Request) {
               pendingCredit: sql`${customers.pendingCredit} + ${finalTotalAmount.toFixed(2)}`,
               updatedAt: new Date(),
             })
-            .where(eq(customers.id, customerId));
+            .where(and(eq(customers.id, customerId), eq(customers.pharmacyId, pharmacyId)));
         }
 
         return {
@@ -176,15 +175,18 @@ export async function POST(request: Request) {
       });
     } catch (dbErr: any) {
       if (dbErr.message && dbErr.message.includes("Insufficient stock")) {
-        throw dbErr; // Re-throw business logic errors directly
+        throw dbErr;
       }
 
-      // If DB is unreachable, execute in offline store
+      // If DB is unreachable, execute in offline store scoped to pharmacy
       const offlineSale = offlineStore.processSale(
+        pharmacyId,
         items,
         customerId || null,
         paymentMethod,
-        discount
+        discount,
+        user.name,
+        user.userId
       );
 
       return NextResponse.json({
@@ -214,9 +216,17 @@ export async function POST(request: Request) {
 // DELETE: Void a sale transaction and restore inventory stock
 export async function DELETE(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized. Admin role required to void sales." }, { status: 403 });
+    const tenantRes = await resolveTenant();
+    if (!tenantRes.success) {
+      return NextResponse.json({ error: tenantRes.error }, { status: tenantRes.status });
+    }
+    const { pharmacyId, user } = tenantRes.tenant;
+
+    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { error: "Unauthorized. Admin role required to void sales." },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(request.url);
@@ -228,14 +238,14 @@ export async function DELETE(request: Request) {
 
     try {
       await db.transaction(async (tx) => {
-        // 1. Find sale
-        const [sale] = await tx.select().from(sales).where(eq(sales.id, id));
+        const [sale] = await tx
+          .select()
+          .from(sales)
+          .where(and(eq(sales.id, id), eq(sales.pharmacyId, pharmacyId)));
         if (!sale) return;
 
-        // 2. Find sale items
         const items = await tx.select().from(saleItems).where(eq(saleItems.saleId, id));
 
-        // 3. Restore stock to batches
         for (const item of items) {
           const [batch] = await tx.select().from(batches).where(eq(batches.id, item.batchId));
           if (batch) {
@@ -249,7 +259,6 @@ export async function DELETE(request: Request) {
           }
         }
 
-        // 4. If credit sale, deduct from customer pending credit
         if (sale.paymentMethod === "CREDIT" && sale.customerId) {
           await tx
             .update(customers)
@@ -257,22 +266,20 @@ export async function DELETE(request: Request) {
               pendingCredit: sql`GREATEST(0, ${customers.pendingCredit} - ${sale.totalAmount})`,
               updatedAt: new Date(),
             })
-            .where(eq(customers.id, sale.customerId));
+            .where(and(eq(customers.id, sale.customerId), eq(customers.pharmacyId, pharmacyId)));
         }
 
-        // 5. Delete sale items and sale record
         await tx.delete(saleItems).where(eq(saleItems.saleId, id));
         await tx.delete(sales).where(eq(sales.id, id));
       });
 
       return NextResponse.json({ success: true, message: "Sale voided and inventory restored" });
     } catch {
-      // Offline store fallback
-      const success = offlineStore.deleteSale(id);
+      const success = offlineStore.deleteSale(pharmacyId, id);
       if (success) {
         return NextResponse.json({ success: true, message: "Sale removed in offline mode" });
       }
-      return NextResponse.json({ error: "Sale not found" }, { status: 404 });
+      return NextResponse.json({ error: "Sale not found in this pharmacy" }, { status: 404 });
     }
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

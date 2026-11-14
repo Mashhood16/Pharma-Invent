@@ -3,9 +3,16 @@ import { db } from "@/db";
 import { batches, medicines, suppliers } from "@/db/schema";
 import { eq, lte, and, sql, asc } from "drizzle-orm";
 import { offlineStore } from "@/db/offline-store";
+import { resolveTenant } from "@/lib/tenant";
 
 export async function GET() {
   try {
+    const tenantRes = await resolveTenant();
+    if (!tenantRes.success) {
+      return NextResponse.json({ error: tenantRes.error }, { status: tenantRes.status });
+    }
+    const { pharmacyId } = tenantRes.tenant;
+
     const today = new Date();
 
     try {
@@ -30,6 +37,7 @@ export async function GET() {
         .innerJoin(suppliers, eq(batches.supplierId, suppliers.id))
         .where(
           and(
+            eq(medicines.pharmacyId, pharmacyId),
             lte(batches.expiryDate, today),
             sql`${batches.boxesInStock} > 0`
           )
@@ -57,6 +65,7 @@ export async function GET() {
         .innerJoin(suppliers, eq(batches.supplierId, suppliers.id))
         .where(
           and(
+            eq(medicines.pharmacyId, pharmacyId),
             sql`${batches.expiryDate} > ${today}`,
             lte(batches.expiryDate, ninetyDaysAhead),
             sql`${batches.boxesInStock} > 0`
@@ -69,13 +78,15 @@ export async function GET() {
         nearExpiry: nearExpiryList,
       });
     } catch {
-      // Offline fallback
+      // Offline fallback scoped to pharmacy
       const expiredList: any[] = [];
       const nearExpiryList: any[] = [];
       const now = new Date();
       const ninetyDays = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
 
-      for (const m of offlineStore.medicines) {
+      const meds = offlineStore.getMedicines(pharmacyId);
+
+      for (const m of meds) {
         for (const b of m.batches) {
           if (b.boxesInStock <= 0) continue;
           const exp = new Date(b.expiryDate);
@@ -117,6 +128,12 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const tenantRes = await resolveTenant();
+    if (!tenantRes.success) {
+      return NextResponse.json({ error: tenantRes.error }, { status: tenantRes.status });
+    }
+    const { pharmacyId } = tenantRes.tenant;
+
     const { batchId } = await request.json();
 
     if (!batchId) {
@@ -125,9 +142,16 @@ export async function POST(request: Request) {
 
     try {
       const [batch] = await db
-        .select()
+        .select({
+          id: batches.id,
+          batchNumber: batches.batchNumber,
+          boxesInStock: batches.boxesInStock,
+          buyPricePerBox: batches.buyPricePerBox,
+          supplierId: batches.supplierId,
+        })
         .from(batches)
-        .where(eq(batches.id, batchId))
+        .innerJoin(medicines, eq(batches.medicineId, medicines.id))
+        .where(and(eq(batches.id, batchId), eq(medicines.pharmacyId, pharmacyId)))
         .limit(1);
 
       if (batch) {
@@ -149,7 +173,7 @@ export async function POST(request: Request) {
               ledgerBalance: sql`${suppliers.ledgerBalance} - ${totalCreditClaim.toFixed(2)}`,
               updatedAt: new Date(),
             })
-            .where(eq(suppliers.id, batch.supplierId));
+            .where(and(eq(suppliers.id, batch.supplierId), eq(suppliers.pharmacyId, pharmacyId)));
         });
 
         return NextResponse.json({
@@ -159,8 +183,7 @@ export async function POST(request: Request) {
         });
       }
     } catch {
-      // Offline fallback RTV
-      const res = offlineStore.processRtv(batchId);
+      const res = offlineStore.processRtv(pharmacyId, batchId);
       return NextResponse.json({
         success: true,
         message: `Processed local RTV for Batch ${res.batchNumber}. ${res.returnedBoxes} boxes pulled from shelf.`,

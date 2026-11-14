@@ -6,12 +6,11 @@ const SECRET_KEY = new TextEncoder().encode(
   process.env.JWT_SECRET || "pharma_invent_super_secure_secret_key_2026_at_least_32_chars!"
 );
 
-// Routes requiring ADMIN role
+// Routes requiring at least ADMIN role
 const ADMIN_ONLY_ROUTES = [
   "/financials",
   "/purchases",
   "/suppliers",
-  "/admin",
   "/settings",
 ];
 
@@ -45,16 +44,29 @@ export async function middleware(request: NextRequest) {
     const { payload } = await jwtVerify(token, SECRET_KEY);
     const role = (payload as { role?: string }).role;
 
-    // If on /login and already logged in, redirect to POS or Dashboard
+    // If on /login and already logged in, redirect based on role
     if (pathname === "/login") {
-      return NextResponse.redirect(new URL("/pos", request.url));
+      const destination = role === "SUPER_ADMIN" ? "/super-admin" : "/pos";
+      return NextResponse.redirect(new URL(destination, request.url));
     }
 
-    // Role-based access control (RBAC): Cashier is restricted from admin routes
+    // Root redirect
+    if (pathname === "/") {
+      const destination = role === "SUPER_ADMIN" ? "/super-admin" : "/pos";
+      return NextResponse.redirect(new URL(destination, request.url));
+    }
+
+    // Strictly protect /super-admin
+    if (pathname.startsWith("/super-admin") && role !== "SUPER_ADMIN") {
+      return NextResponse.redirect(new URL("/pos?error=unauthorized", request.url));
+    }
+
+    // Cashier restrictions
     if (role === "CASHIER") {
-      const isRestricted = ADMIN_ONLY_ROUTES.some((route) =>
-        pathname.startsWith(route)
-      );
+      const isRestricted =
+        pathname.startsWith("/super-admin") ||
+        ADMIN_ONLY_ROUTES.some((route) => pathname.startsWith(route));
+
       if (isRestricted) {
         return NextResponse.redirect(new URL("/pos?error=unauthorized", request.url));
       }

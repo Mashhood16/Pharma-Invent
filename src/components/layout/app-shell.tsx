@@ -5,14 +5,21 @@ import { usePathname } from "next/navigation";
 import { DesktopTitlebar } from "@/components/desktop/titlebar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { AIAssistantModal } from "@/components/ai/ai-assistant-modal";
+import { SuperAdminBanner } from "@/components/layout/super-admin-banner";
+import { Role } from "@/lib/auth";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLoginPage = pathname === "/login";
+  const isSuperAdminPortal = pathname === "/super-admin";
 
   const [user, setUser] = useState<{
     name: string;
-    role: "ADMIN" | "CASHIER";
+    role: Role;
+    pharmacyName?: string | null;
+    activePharmacyId?: string | null;
+    activePharmacyName?: string | null;
+    activePharmacyDsl?: string | null;
   } | null>(null);
   const [isAIOpen, setIsAIOpen] = useState(false);
 
@@ -37,6 +44,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             setUser({
               name: data.user.name,
               role: data.user.role,
+              pharmacyName: data.user.pharmacyName,
+              activePharmacyId: data.user.activePharmacyId,
+              activePharmacyName: data.user.activePharmacyName,
+              activePharmacyDsl: data.user.activePharmacyDsl,
             });
           }
         })
@@ -61,7 +72,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         onToggleAI={() => setIsAIOpen(!isAIOpen)}
       />
 
-      {/* 2. Main Workspace Layout */}
+      {/* 2. Super Admin Tenant Inspection Banner */}
+      {user?.role === "SUPER_ADMIN" && !isSuperAdminPortal && (
+        <SuperAdminBanner
+          currentPharmacyId={user.activePharmacyId}
+          currentPharmacyName={user.activePharmacyName}
+          currentPharmacyDsl={user.activePharmacyDsl}
+        />
+      )}
+
+      {/* 3. Main Workspace Layout */}
       <div className="flex flex-1 overflow-hidden">
         {/* Clean Enterprise Sidebar */}
         <Sidebar
@@ -75,11 +95,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {/* 3. Non-intrusive AI Slide-out Drawer */}
+      {/* 4. Non-intrusive AI Slide-out Drawer */}
       <AIAssistantModal
         isOpen={isAIOpen}
         onClose={() => setIsAIOpen(false)}
-        userRole={user?.role || "ADMIN"}
+        userRole={user?.role === "SUPER_ADMIN" ? "ADMIN" : user?.role || "ADMIN"}
       />
     </div>
   );

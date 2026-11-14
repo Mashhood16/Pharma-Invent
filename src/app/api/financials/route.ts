@@ -2,13 +2,18 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { sales, users, customers } from "@/db/schema";
 import { sql, gte, lte, and, desc, eq } from "drizzle-orm";
-import { getCurrentUser } from "@/lib/auth";
 import { offlineStore } from "@/db/offline-store";
+import { resolveTenant } from "@/lib/tenant";
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
+    const tenantRes = await resolveTenant();
+    if (!tenantRes.success) {
+      return NextResponse.json({ error: tenantRes.error }, { status: tenantRes.status });
+    }
+    const { pharmacyId, user } = tenantRes.tenant;
+
+    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
       return NextResponse.json({ error: "Unauthorized. Admin access required." }, { status: 403 });
     }
 
@@ -28,7 +33,13 @@ export async function GET() {
           count: sql<number>`COUNT(*)`,
         })
         .from(sales)
-        .where(and(gte(sales.createdAt, startOfToday), lte(sales.createdAt, endOfToday)));
+        .where(
+          and(
+            eq(sales.pharmacyId, pharmacyId),
+            gte(sales.createdAt, startOfToday),
+            lte(sales.createdAt, endOfToday)
+          )
+        );
 
       const [monthlyMetrics] = await db
         .select({
@@ -37,7 +48,13 @@ export async function GET() {
           count: sql<number>`COUNT(*)`,
         })
         .from(sales)
-        .where(and(gte(sales.createdAt, startOfMonth), lte(sales.createdAt, endOfMonth)));
+        .where(
+          and(
+            eq(sales.pharmacyId, pharmacyId),
+            gte(sales.createdAt, startOfMonth),
+            lte(sales.createdAt, endOfMonth)
+          )
+        );
 
       const [yearlyMetrics] = await db
         .select({
@@ -46,7 +63,13 @@ export async function GET() {
           count: sql<number>`COUNT(*)`,
         })
         .from(sales)
-        .where(and(gte(sales.createdAt, startOfYear), lte(sales.createdAt, endOfYear)));
+        .where(
+          and(
+            eq(sales.pharmacyId, pharmacyId),
+            gte(sales.createdAt, startOfYear),
+            lte(sales.createdAt, endOfYear)
+          )
+        );
 
       const recentSales = await db
         .select({
@@ -62,6 +85,7 @@ export async function GET() {
         .from(sales)
         .innerJoin(users, eq(sales.userId, users.id))
         .leftJoin(customers, eq(sales.customerId, customers.id))
+        .where(eq(sales.pharmacyId, pharmacyId))
         .orderBy(desc(sales.createdAt))
         .limit(30);
 
@@ -86,35 +110,9 @@ export async function GET() {
         recentSales,
       });
     } catch {
-      // Offline mode: exact metrics based strictly on recorded sales (starts at 0 with no dummy data)
-      const allSales = offlineStore.sales;
-      const now = new Date();
-
-      const todaySales = allSales.filter((s) => {
-        const d = new Date(s.createdAt);
-        return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      });
-
-      const monthSales = allSales.filter((s) => {
-        const d = new Date(s.createdAt);
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      });
-
-      const dailyTotal = todaySales.reduce((sum, s) => sum + s.totalAmount, 0);
-      const dailyProfit = todaySales.reduce((sum, s) => sum + s.totalProfit, 0);
-      const monthlyTotal = monthSales.reduce((sum, s) => sum + s.totalAmount, 0);
-      const monthlyProfit = monthSales.reduce((sum, s) => sum + s.totalProfit, 0);
-      const yearlyTotal = allSales.reduce((sum, s) => sum + s.totalAmount, 0);
-      const yearlyProfit = allSales.reduce((sum, s) => sum + s.totalProfit, 0);
-
-      return NextResponse.json({
-        metrics: {
-          daily: { sales: dailyTotal, profit: dailyProfit, orders: todaySales.length },
-          monthly: { sales: monthlyTotal, profit: monthlyProfit, orders: monthSales.length },
-          yearly: { sales: yearlyTotal, profit: yearlyProfit, orders: allSales.length },
-        },
-        recentSales: allSales,
-      });
+      // Offline mode scoped strictly to this pharmacy
+      const result = offlineStore.getFinancialMetrics(pharmacyId);
+      return NextResponse.json(result);
     }
   } catch (error: any) {
     console.error("Financials error:", error);

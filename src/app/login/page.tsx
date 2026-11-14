@@ -33,7 +33,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/pos");
+      router.push(data.redirectTo || "/pos");
       router.refresh();
     } catch {
       setError("Unable to connect to local authentication service.");

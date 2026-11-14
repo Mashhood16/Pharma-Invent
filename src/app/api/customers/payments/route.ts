@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { offlineStore } from "@/db/offline-store";
-import { getCurrentUser } from "@/lib/auth";
+import { resolveTenant } from "@/lib/tenant";
 
 export async function GET(request: Request) {
   try {
+    const tenantRes = await resolveTenant();
+    if (!tenantRes.success) {
+      return NextResponse.json({ error: tenantRes.error }, { status: tenantRes.status });
+    }
+    const { pharmacyId } = tenantRes.tenant;
+
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get("customerId");
 
-    let payments = offlineStore.customerPayments;
+    let payments = offlineStore.getCustomerPayments(pharmacyId);
     if (customerId) {
       payments = payments.filter((p) => p.customerId === customerId);
     }
@@ -19,10 +25,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const tenantRes = await resolveTenant();
+    if (!tenantRes.success) {
+      return NextResponse.json({ error: tenantRes.error }, { status: tenantRes.status });
     }
+    const { pharmacyId } = tenantRes.tenant;
 
     const body = await request.json();
     const { customerId, amount, paymentMethod, notes } = body;
@@ -34,7 +41,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const payment = offlineStore.recordCustomerPayment({
+    const payment = offlineStore.recordCustomerPayment(pharmacyId, {
       customerId,
       amount: Number(amount),
       paymentMethod: paymentMethod || "CASH",

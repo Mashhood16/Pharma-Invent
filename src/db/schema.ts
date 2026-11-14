@@ -2,12 +2,28 @@ import { pgTable, uuid, text, varchar, timestamp, integer, numeric, pgEnum } fro
 import { relations, sql } from "drizzle-orm";
 
 // Enums
-export const roleEnum = pgEnum("role", ["ADMIN", "CASHIER"]);
+export const roleEnum = pgEnum("role", ["SUPER_ADMIN", "ADMIN", "CASHIER"]);
 export const paymentMethodEnum = pgEnum("payment_method", ["CASH", "CREDIT"]);
+export const pharmacyStatusEnum = pgEnum("pharmacy_status", ["ACTIVE", "SUSPENDED"]);
+
+// 0. Pharmacies (Tenants)
+export const pharmacies = pgTable("pharmacies", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  dslNumber: varchar("dsl_number", { length: 100 }).notNull(),
+  ntn: varchar("ntn", { length: 100 }),
+  ownerName: varchar("owner_name", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 50 }).notNull(),
+  address: text("address").notNull(),
+  status: pharmacyStatusEnum("status").default("ACTIVE").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
 
 // 1. Users
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
+  pharmacyId: uuid("pharmacy_id").references(() => pharmacies.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   username: varchar("username", { length: 100 }).notNull().unique(),
   role: roleEnum("role").default("CASHIER").notNull(),
@@ -19,10 +35,12 @@ export const users = pgTable("users", {
 // 2. Medicines
 export const medicines = pgTable("medicines", {
   id: uuid("id").defaultRandom().primaryKey(),
+  pharmacyId: uuid("pharmacy_id")
+    .references(() => pharmacies.id, { onDelete: "cascade" }),
   brandName: varchar("brand_name", { length: 255 }).notNull(),
   genericFormula: varchar("generic_formula", { length: 255 }).notNull(),
   category: varchar("category", { length: 100 }).notNull().default("General"),
-  barcode: varchar("barcode", { length: 100 }).unique(),
+  barcode: varchar("barcode", { length: 100 }),
   reorderLevel: integer("reorder_level").notNull().default(2),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -31,6 +49,8 @@ export const medicines = pgTable("medicines", {
 // 3. Suppliers
 export const suppliers = pgTable("suppliers", {
   id: uuid("id").defaultRandom().primaryKey(),
+  pharmacyId: uuid("pharmacy_id")
+    .references(() => pharmacies.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   contactInfo: text("contact_info"),
   ledgerBalance: numeric("ledger_balance", { precision: 12, scale: 2 }).notNull().default("0.00"),
@@ -62,6 +82,8 @@ export const batches = pgTable("batches", {
 // 5. Customers (Khata / Credit Ledger)
 export const customers = pgTable("customers", {
   id: uuid("id").defaultRandom().primaryKey(),
+  pharmacyId: uuid("pharmacy_id")
+    .references(() => pharmacies.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   phone: varchar("phone", { length: 50 }).notNull(),
   pendingCredit: numeric("pending_credit", { precision: 12, scale: 2 }).notNull().default("0.00"),
@@ -72,6 +94,8 @@ export const customers = pgTable("customers", {
 // 6. Sales
 export const sales = pgTable("sales", {
   id: uuid("id").defaultRandom().primaryKey(),
+  pharmacyId: uuid("pharmacy_id")
+    .references(() => pharmacies.id, { onDelete: "cascade" }),
   receiptNumber: varchar("receipt_number", { length: 100 }).notNull().unique(),
   userId: uuid("user_id")
     .notNull()
@@ -102,6 +126,8 @@ export const saleItems = pgTable("sale_items", {
 // 8. Purchases (Stock In / Inflow)
 export const purchases = pgTable("purchases", {
   id: uuid("id").defaultRandom().primaryKey(),
+  pharmacyId: uuid("pharmacy_id")
+    .references(() => pharmacies.id, { onDelete: "cascade" }),
   supplierId: uuid("supplier_id")
     .notNull()
     .references(() => suppliers.id, { onDelete: "restrict" }),
@@ -200,6 +226,9 @@ export const purchaseItemsRelations = relations(purchaseItems, ({ one }) => ({
 }));
 
 // TypeScript Type Inference Exports
+export type Pharmacy = typeof pharmacies.$inferSelect;
+export type NewPharmacy = typeof pharmacies.$inferInsert;
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 

@@ -1,16 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { medicines, batches, suppliers } from "@/db/schema";
-import { eq, ilike } from "drizzle-orm";
+import { eq, ilike, and } from "drizzle-orm";
 import { offlineStore } from "@/db/offline-store";
-import { getCurrentUser } from "@/lib/auth";
+import { resolveTenant } from "@/lib/tenant";
 import { generateTemplateWorkbook } from "@/lib/excel-template";
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const format = searchParams.get("format") || "xlsx";
-
     const buffer = generateTemplateWorkbook();
 
     return new NextResponse(Buffer.from(buffer), {
@@ -27,9 +24,17 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized. Admin role required." }, { status: 403 });
+    const tenantRes = await resolveTenant();
+    if (!tenantRes.success) {
+      return NextResponse.json({ error: tenantRes.error }, { status: tenantRes.status });
+    }
+    const { pharmacyId, user } = tenantRes.tenant;
+
+    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { error: "Unauthorized. Admin or Super Admin role required." },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();
@@ -72,17 +77,18 @@ export async function POST(request: Request) {
       }
 
       try {
-        // 1. Resolve or create supplier in PostgreSQL
+        // 1. Resolve or create supplier in PostgreSQL scoped to pharmacy
         let [existingSup] = await db
           .select()
           .from(suppliers)
-          .where(ilike(suppliers.name, supplierName))
+          .where(and(eq(suppliers.pharmacyId, pharmacyId), ilike(suppliers.name, supplierName)))
           .limit(1);
 
         if (!existingSup) {
           const [createdSup] = await db
             .insert(suppliers)
             .values({
+              pharmacyId,
               name: supplierName,
               contactInfo: "Bulk imported",
               ledgerBalance: "0",
@@ -91,10 +97,11 @@ export async function POST(request: Request) {
           existingSup = createdSup;
         }
 
-        // 2. Insert medicine
+        // 2. Insert medicine scoped to pharmacy
         const [newMed] = await db
           .insert(medicines)
           .values({
+            pharmacyId,
             brandName,
             genericFormula,
             category,
@@ -118,21 +125,20 @@ export async function POST(request: Request) {
 
         insertedCount++;
       } catch {
-        // Fallback to offline store
-        let offSup = offlineStore.suppliers.find(
-          (s) => s.name.toLowerCase() === supplierName.toLowerCase()
-        );
+        // Fallback to offline store scoped to pharmacy
+        let offSup = offlineStore
+          .getSuppliers(pharmacyId)
+          .find((s) => s.name.toLowerCase() === supplierName.toLowerCase());
+
         if (!offSup) {
-          offSup = {
-            id: `sup-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          offSup = offlineStore.addSupplier(pharmacyId, {
             name: supplierName,
             contactInfo: "Bulk imported",
             ledgerBalance: 0,
-          };
-          offlineStore.suppliers.push(offSup);
+          });
         }
 
-        offlineStore.addMedicine({
+        offlineStore.addMedicine(pharmacyId, {
           brandName,
           genericFormula,
           category,

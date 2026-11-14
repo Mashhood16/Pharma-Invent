@@ -1,14 +1,21 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { suppliers } from "@/db/schema";
-import { desc } from "drizzle-orm";
-import { getCurrentUser } from "@/lib/auth";
+import { desc, eq } from "drizzle-orm";
 import { offlineStore } from "@/db/offline-store";
+import { resolveTenant } from "@/lib/tenant";
 
 export async function GET() {
   try {
+    const tenantRes = await resolveTenant();
+    if (!tenantRes.success) {
+      return NextResponse.json({ error: tenantRes.error }, { status: tenantRes.status });
+    }
+    const { pharmacyId } = tenantRes.tenant;
+
     try {
       const list = await db.query.suppliers.findMany({
+        where: eq(suppliers.pharmacyId, pharmacyId),
         orderBy: [desc(suppliers.updatedAt)],
         with: {
           batches: true,
@@ -17,8 +24,8 @@ export async function GET() {
       });
       return NextResponse.json(list);
     } catch {
-      // Offline fallback
-      return NextResponse.json(offlineStore.suppliers);
+      // Offline fallback scoped to pharmacy
+      return NextResponse.json(offlineStore.getSuppliers(pharmacyId));
     }
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -27,8 +34,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
+    const tenantRes = await resolveTenant();
+    if (!tenantRes.success) {
+      return NextResponse.json({ error: tenantRes.error }, { status: tenantRes.status });
+    }
+    const { pharmacyId, user } = tenantRes.tenant;
+
+    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -42,6 +54,7 @@ export async function POST(request: Request) {
       const [newSupplier] = await db
         .insert(suppliers)
         .values({
+          pharmacyId,
           name: name.trim(),
           contactInfo: contactInfo?.trim() || "",
           ledgerBalance: (ledgerBalance || 0).toString(),
@@ -50,14 +63,11 @@ export async function POST(request: Request) {
 
       return NextResponse.json(newSupplier);
     } catch {
-      // Offline fallback
-      const newSup = {
-        id: `sup-${Date.now()}`,
-        name: name.trim(),
-        contactInfo: contactInfo?.trim() || "",
+      const newSup = offlineStore.addSupplier(pharmacyId, {
+        name,
+        contactInfo,
         ledgerBalance: parseFloat(ledgerBalance) || 0,
-      };
-      offlineStore.suppliers.push(newSup);
+      });
       return NextResponse.json(newSup);
     }
   } catch (error: any) {

@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyPassword, createSessionToken, setAuthCookie } from "@/lib/auth";
+import { offlineStore } from "@/db/offline-store";
 
 export async function POST(request: Request) {
   try {
@@ -17,6 +18,7 @@ export async function POST(request: Request) {
 
     const cleanUsername = username.trim().toLowerCase();
 
+    // 1. Try PostgreSQL Database if connected
     try {
       const [user] = await db
         .select()
@@ -27,13 +29,19 @@ export async function POST(request: Request) {
       if (user) {
         const isValid = await verifyPassword(password, user.passwordHash);
         if (isValid) {
+          const pharm = user.pharmacyId ? offlineStore.getPharmacy(user.pharmacyId) : null;
           const token = await createSessionToken({
             userId: user.id,
             name: user.name,
             username: user.username,
-            role: user.role,
+            role: user.role as any,
+            pharmacyId: user.pharmacyId,
+            pharmacyName: pharm?.name || null,
           });
           await setAuthCookie(token);
+
+          const redirectTo = user.role === "SUPER_ADMIN" ? "/super-admin" : "/pos";
+
           return NextResponse.json({
             success: true,
             user: {
@@ -41,52 +49,80 @@ export async function POST(request: Request) {
               name: user.name,
               username: user.username,
               role: user.role,
+              pharmacyId: user.pharmacyId,
+              pharmacyName: pharm?.name || null,
             },
+            redirectTo,
           });
         }
       }
     } catch {
-      // Offline fallback credentials
-      console.log("Using offline authentication fallback");
+      // Postgres not available, fallback to offline store
     }
 
-    // Default offline/local credentials check
-    if (cleanUsername === "admin" && password === "admin123") {
-      const token = await createSessionToken({
-        userId: "admin-default-id",
-        name: "Dr. Hamza Siddiqui (Head Pharmacist)",
-        username: "admin",
-        role: "ADMIN",
-      });
-      await setAuthCookie(token);
-      return NextResponse.json({
-        success: true,
-        user: {
-          id: "admin-default-id",
-          name: "Dr. Hamza Siddiqui (Head Pharmacist)",
-          username: "admin",
-          role: "ADMIN",
-        },
-      });
-    }
+    // 2. Multi-Tenant Offline / Standalone Store Check
+    const localUser = offlineStore.users.find(
+      (u) => u.username.toLowerCase() === cleanUsername
+    );
 
-    if (cleanUsername === "cashier" && password === "cashier123") {
-      const token = await createSessionToken({
-        userId: "cashier-default-id",
-        name: "Ali Raza (Terminal Cashier)",
-        username: "cashier",
-        role: "CASHIER",
-      });
-      await setAuthCookie(token);
-      return NextResponse.json({
-        success: true,
-        user: {
-          id: "cashier-default-id",
-          name: "Ali Raza (Terminal Cashier)",
-          username: "cashier",
-          role: "CASHIER",
-        },
-      });
+    if (localUser) {
+      // Support plaintext or bcrypt hash
+      let isValid = false;
+      if (localUser.passwordHash.startsWith("$2a$") || localUser.passwordHash.startsWith("$2b$")) {
+        isValid = await verifyPassword(password, localUser.passwordHash);
+      } else {
+        isValid = password === localUser.passwordHash;
+      }
+
+      if (isValid) {
+        // If tenant user, verify pharmacy is active
+        let pharmName: string | null = null;
+        if (localUser.pharmacyId) {
+          const pharm = offlineStore.getPharmacy(localUser.pharmacyId);
+          if (!pharm) {
+            return NextResponse.json(
+              { error: "Pharmacy account does not exist or has been deleted." },
+              { status: 403 }
+            );
+          }
+          if (pharm.status === "SUSPENDED") {
+            return NextResponse.json(
+              {
+                error:
+                  "This pharmacy account is currently suspended. Please contact the platform Super Admin.",
+              },
+              { status: 403 }
+            );
+          }
+          pharmName = pharm.name;
+        }
+
+        const token = await createSessionToken({
+          userId: localUser.id,
+          name: localUser.name,
+          username: localUser.username,
+          role: localUser.role,
+          pharmacyId: localUser.pharmacyId,
+          pharmacyName: pharmName,
+        });
+
+        await setAuthCookie(token);
+
+        const redirectTo = localUser.role === "SUPER_ADMIN" ? "/super-admin" : "/pos";
+
+        return NextResponse.json({
+          success: true,
+          user: {
+            id: localUser.id,
+            name: localUser.name,
+            username: localUser.username,
+            role: localUser.role,
+            pharmacyId: localUser.pharmacyId,
+            pharmacyName: pharmName,
+          },
+          redirectTo,
+        });
+      }
     }
 
     return NextResponse.json(
