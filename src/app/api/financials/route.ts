@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, isDbConfigured } from "@/db";
 import { sales, users, customers } from "@/db/schema";
 import { sql, gte, lte, and, desc, eq } from "drizzle-orm";
 import { offlineStore } from "@/db/offline-store";
@@ -17,8 +17,9 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized. Admin access required." }, { status: 403 });
     }
 
-    try {
-      const now = new Date();
+    if (isDbConfigured) {
+      try {
+        const now = new Date();
       const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
       const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
@@ -109,11 +110,14 @@ export async function GET() {
         },
         recentSales,
       });
-    } catch {
-      // Offline mode scoped strictly to this pharmacy
-      const result = offlineStore.getFinancialMetrics(pharmacyId);
-      return NextResponse.json(result);
+      } catch {
+        // Fallback to offline store
+      }
     }
+
+    // Offline mode scoped strictly to this pharmacy
+    const result = offlineStore.getFinancialMetrics(pharmacyId);
+    return NextResponse.json(result);
   } catch (error: any) {
     console.error("Financials error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

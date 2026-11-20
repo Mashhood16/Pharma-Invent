@@ -136,7 +136,8 @@ export interface OfflineSupplierPayment {
   createdAt: string;
 }
 
-const DATA_FILE = path.join(process.cwd(), "pharmacies-data.json");
+const PRIMARY_FILE = path.join(process.cwd(), "pharmacies-data.json");
+const TMP_FILE = path.join("/tmp", "pharmacies-data.json");
 
 class OfflinePharmacyStore {
   pharmacies: OfflinePharmacy[] = [];
@@ -155,32 +156,98 @@ class OfflinePharmacyStore {
     if (this.pharmacies.length === 0) {
       this.initDefaultSeed();
     }
+    this.ensureDefaultUsers();
+  }
+
+  private ensureDefaultUsers() {
+    if (!this.users.some((u) => u.username.toLowerCase() === "superadmin")) {
+      this.users.unshift({
+        id: "user-superadmin",
+        pharmacyId: null,
+        username: "superadmin",
+        passwordHash: "superadmin123",
+        name: "Master Super Admin (Platform Owner)",
+        role: "SUPER_ADMIN",
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    if (!this.users.some((u) => u.username.toLowerCase() === "admin")) {
+      this.users.push({
+        id: "user-admin-default",
+        pharmacyId: "pharm-default",
+        username: "admin",
+        passwordHash: "admin123",
+        name: "Dr. Hamza Siddiqui (Head Pharmacist)",
+        role: "ADMIN",
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    if (!this.users.some((u) => u.username.toLowerCase() === "cashier")) {
+      this.users.push({
+        id: "user-cashier-default",
+        pharmacyId: "pharm-default",
+        username: "cashier",
+        passwordHash: "cashier123",
+        name: "Ali Raza (Terminal Cashier)",
+        role: "CASHIER",
+        createdAt: new Date().toISOString(),
+      });
+    }
   }
 
   private saveToDisk() {
+    const dump = {
+      pharmacies: this.pharmacies,
+      users: this.users,
+      suppliers: this.suppliers,
+      customers: this.customers,
+      medicines: this.medicines,
+      sales: this.sales,
+      purchases: this.purchases,
+      customerPayments: this.customerPayments,
+      supplierPayments: this.supplierPayments,
+      pharmacySettings: this.pharmacySettings,
+    };
+    const jsonStr = JSON.stringify(dump, null, 2);
+
+    // Try saving to project root first
+    let saved = false;
     try {
-      const dump = {
-        pharmacies: this.pharmacies,
-        users: this.users,
-        suppliers: this.suppliers,
-        customers: this.customers,
-        medicines: this.medicines,
-        sales: this.sales,
-        purchases: this.purchases,
-        customerPayments: this.customerPayments,
-        supplierPayments: this.supplierPayments,
-        pharmacySettings: this.pharmacySettings,
-      };
-      fs.writeFileSync(DATA_FILE, JSON.stringify(dump, null, 2), "utf-8");
+      fs.writeFileSync(PRIMARY_FILE, jsonStr, "utf-8");
+      saved = true;
     } catch {
-      // In read-only or serverless environments, state remains in-memory
+      // Root might be read-only on Vercel serverless
+    }
+
+    // On Vercel / serverless runtime, also persist to writable /tmp
+    try {
+      fs.writeFileSync(TMP_FILE, jsonStr, "utf-8");
+      saved = true;
+    } catch {
+      // Ephemeral fallback
     }
   }
 
   private loadFromDisk() {
     try {
-      if (fs.existsSync(DATA_FILE)) {
-        const raw = fs.readFileSync(DATA_FILE, "utf-8");
+      // 1. Check writable /tmp first on serverless
+      let raw: string | null = null;
+      if (fs.existsSync(TMP_FILE)) {
+        try {
+          raw = fs.readFileSync(TMP_FILE, "utf-8");
+        } catch {}
+      }
+
+      // 2. Fall back to bundled data file
+      if (!raw && fs.existsSync(PRIMARY_FILE)) {
+        try {
+          raw = fs.readFileSync(PRIMARY_FILE, "utf-8");
+        } catch {}
+      }
+
+      if (raw) {
         const dump = JSON.parse(raw);
         this.pharmacies = dump.pharmacies || [];
         this.users = dump.users || [];

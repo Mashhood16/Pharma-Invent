@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, isDbConfigured } from "@/db";
 import { medicines, batches, suppliers } from "@/db/schema";
 import { desc, sql, eq, and } from "drizzle-orm";
 import { offlineStore } from "@/db/offline-store";
@@ -13,34 +13,37 @@ export async function GET() {
     }
     const { pharmacyId } = tenantRes.tenant;
 
-    try {
-      const list = await db.query.medicines.findMany({
-        where: eq(medicines.pharmacyId, pharmacyId),
-        orderBy: [desc(medicines.createdAt)],
-        with: {
-          batches: {
-            with: {
-              supplier: true,
+    if (isDbConfigured) {
+      try {
+        const list = await db.query.medicines.findMany({
+          where: eq(medicines.pharmacyId, pharmacyId),
+          orderBy: [desc(medicines.createdAt)],
+          with: {
+            batches: {
+              with: {
+                supplier: true,
+              },
             },
           },
-        },
-      });
+        });
 
-      const enriched = list.map((med) => {
-        const totalBoxes = med.batches.reduce(
-          (sum, b) => sum + parseFloat(b.boxesInStock),
-          0
-        );
-        return {
-          ...med,
-          totalBoxesInStock: totalBoxes,
-          isLowStock: totalBoxes <= med.reorderLevel,
-        };
-      });
+        const enriched = list.map((med) => {
+          const totalBoxes = med.batches.reduce(
+            (sum, b) => sum + parseFloat(b.boxesInStock),
+            0
+          );
+          return {
+            ...med,
+            totalBoxesInStock: totalBoxes,
+            isLowStock: totalBoxes <= med.reorderLevel,
+          };
+        });
 
-      return NextResponse.json(enriched);
-    } catch {
-      // Offline mode: scoped strictly to current pharmacy
+        return NextResponse.json(enriched);
+      } catch {
+        // Fallback to offline store if DB error occurs
+      }
+    }
       const meds = offlineStore.getMedicines(pharmacyId);
       const enriched = meds.map((med) => {
         const totalBoxes = med.batches.reduce(
@@ -54,7 +57,6 @@ export async function GET() {
         };
       });
       return NextResponse.json(enriched);
-    }
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -85,56 +87,60 @@ export async function POST(request: Request) {
       );
     }
 
-    try {
-      const [newMed] = await db
-        .insert(medicines)
-        .values({
-          pharmacyId,
-          brandName: brandName.trim(),
-          genericFormula: genericFormula.trim(),
-          category: category?.trim() || "Tablets (Oral)",
-          barcode: barcode?.trim() || null,
-          reorderLevel: Number(reorderLevel) || 2,
-        })
-        .returning();
+    if (isDbConfigured) {
+      try {
+        const [newMed] = await db
+          .insert(medicines)
+          .values({
+            pharmacyId,
+            brandName: brandName.trim(),
+            genericFormula: genericFormula.trim(),
+            category: category?.trim() || "Tablets (Oral)",
+            barcode: barcode?.trim() || null,
+            reorderLevel: Number(reorderLevel) || 2,
+          })
+          .returning();
 
-      if (initialBatch && initialBatch.batchNumber && initialBatch.supplierId) {
-        const unitsPerBox = Number(initialBatch.unitsPerBox) || 100;
-        let unitPrice = Number(initialBatch.retailPricePerUnit) || 0;
-        let boxPrice = Number(initialBatch.retailPricePerBox) || 0;
+        if (initialBatch && initialBatch.batchNumber && initialBatch.supplierId) {
+          const unitsPerBox = Number(initialBatch.unitsPerBox) || 100;
+          let unitPrice = Number(initialBatch.retailPricePerUnit) || 0;
+          let boxPrice = Number(initialBatch.retailPricePerBox) || 0;
 
-        if (boxPrice > 0 && unitPrice === 0) {
-          unitPrice = boxPrice / unitsPerBox;
-        } else if (unitPrice > 0 && boxPrice === 0) {
-          boxPrice = unitPrice * unitsPerBox;
+          if (boxPrice > 0 && unitPrice === 0) {
+            unitPrice = boxPrice / unitsPerBox;
+          } else if (unitPrice > 0 && boxPrice === 0) {
+            boxPrice = unitPrice * unitsPerBox;
+          }
+
+          await db.insert(batches).values({
+            medicineId: newMed.id,
+            batchNumber: initialBatch.batchNumber.trim(),
+            supplierId: initialBatch.supplierId,
+            expiryDate: new Date(initialBatch.expiryDate),
+            boxesInStock: (initialBatch.boxesInStock || 0).toString(),
+            unitsPerBox,
+            buyPricePerBox: (initialBatch.buyPricePerBox || 0).toString(),
+            retailPricePerBox: boxPrice.toString(),
+            retailPricePerUnit: unitPrice.toString(),
+          });
         }
 
-        await db.insert(batches).values({
-          medicineId: newMed.id,
-          batchNumber: initialBatch.batchNumber.trim(),
-          supplierId: initialBatch.supplierId,
-          expiryDate: new Date(initialBatch.expiryDate),
-          boxesInStock: (initialBatch.boxesInStock || 0).toString(),
-          unitsPerBox,
-          buyPricePerBox: (initialBatch.buyPricePerBox || 0).toString(),
-          retailPricePerBox: boxPrice.toString(),
-          retailPricePerUnit: unitPrice.toString(),
-        });
+        return NextResponse.json(newMed);
+      } catch {
+        // Fallback to offline store
       }
-
-      return NextResponse.json(newMed);
-    } catch {
-      // Offline fallback creation scoped to pharmacy
-      const createdMed = offlineStore.addMedicine(pharmacyId, {
-        brandName,
-        genericFormula,
-        category: category || "Tablets (Oral)",
-        barcode: barcode || null,
-        reorderLevel: Number(reorderLevel) || 2,
-        initialBatch,
-      });
-      return NextResponse.json(createdMed);
     }
+
+    // Offline fallback creation scoped to pharmacy
+    const createdMed = offlineStore.addMedicine(pharmacyId, {
+      brandName,
+      genericFormula,
+      category: category || "Tablets (Oral)",
+      barcode: barcode || null,
+      reorderLevel: Number(reorderLevel) || 2,
+      initialBatch,
+    });
+    return NextResponse.json(createdMed);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

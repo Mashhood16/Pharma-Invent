@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, isDbConfigured } from "@/db";
 import { sales, saleItems, batches, medicines, customers } from "@/db/schema";
 import { eq, sql, and } from "drizzle-orm";
 import { z } from "zod";
@@ -41,9 +41,10 @@ export async function POST(request: Request) {
 
     const { customerId, paymentMethod, discount, items } = validation.data;
 
-    try {
-      // 1. Try PostgreSQL ACID Transaction scoped to pharmacy
-      const result = await db.transaction(async (tx) => {
+    if (isDbConfigured) {
+      try {
+        // 1. Try PostgreSQL ACID Transaction scoped to pharmacy
+        const result = await db.transaction(async (tx) => {
         let calculatedTotalAmount = 0;
         let calculatedTotalProfit = 0;
 
@@ -173,21 +174,24 @@ export async function POST(request: Request) {
         message: "Sale processed successfully",
         sale: result,
       });
-    } catch (dbErr: any) {
-      if (dbErr.message && dbErr.message.includes("Insufficient stock")) {
-        throw dbErr;
+      } catch (dbErr: any) {
+        if (dbErr.message && dbErr.message.includes("Insufficient stock")) {
+          throw dbErr;
+        }
+        // Fallback to offline store
       }
+    }
 
-      // If DB is unreachable, execute in offline store scoped to pharmacy
-      const offlineSale = offlineStore.processSale(
-        pharmacyId,
-        items,
-        customerId || null,
-        paymentMethod,
-        discount,
-        user.name,
-        user.userId
-      );
+    // If DB is unreachable, execute in offline store scoped to pharmacy
+    const offlineSale = offlineStore.processSale(
+      pharmacyId,
+      items,
+      customerId || null,
+      paymentMethod,
+      discount,
+      user.name,
+      user.userId
+    );
 
       return NextResponse.json({
         success: true,
@@ -201,7 +205,6 @@ export async function POST(request: Request) {
           itemsCount: offlineSale.items.length,
         },
       });
-    }
   } catch (error: any) {
     console.error("Checkout transaction error:", error);
     return NextResponse.json(

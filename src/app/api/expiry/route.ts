@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, isDbConfigured } from "@/db";
 import { batches, medicines, suppliers } from "@/db/schema";
 import { eq, lte, and, sql, asc } from "drizzle-orm";
 import { offlineStore } from "@/db/offline-store";
@@ -15,8 +15,9 @@ export async function GET() {
 
     const today = new Date();
 
-    try {
-      const expiredList = await db
+    if (isDbConfigured) {
+      try {
+        const expiredList = await db
         .select({
           batchId: batches.id,
           batchNumber: batches.batchNumber,
@@ -73,12 +74,16 @@ export async function GET() {
         )
         .orderBy(asc(batches.expiryDate));
 
-      return NextResponse.json({
-        expired: expiredList,
-        nearExpiry: nearExpiryList,
-      });
-    } catch {
-      // Offline fallback scoped to pharmacy
+        return NextResponse.json({
+          expired: expiredList,
+          nearExpiry: nearExpiryList,
+        });
+      } catch {
+        // Fallback to offline store
+      }
+    }
+
+    // Offline fallback scoped to pharmacy
       const expiredList: any[] = [];
       const nearExpiryList: any[] = [];
       const now = new Date();
@@ -119,7 +124,6 @@ export async function GET() {
         expired: expiredList,
         nearExpiry: nearExpiryList,
       });
-    }
   } catch (error: any) {
     console.error("Expiry fetch error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

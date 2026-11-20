@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, isDbConfigured } from "@/db";
 import { customers } from "@/db/schema";
 import { ilike, or, desc, eq, and } from "drizzle-orm";
 import { offlineStore } from "@/db/offline-store";
@@ -16,42 +16,46 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q")?.trim() || "";
 
-    try {
-      if (!query) {
+    if (isDbConfigured) {
+      try {
+        if (!query) {
+          const list = await db
+            .select()
+            .from(customers)
+            .where(eq(customers.pharmacyId, pharmacyId))
+            .orderBy(desc(customers.updatedAt))
+            .limit(30);
+          return NextResponse.json(list);
+        }
+
         const list = await db
           .select()
           .from(customers)
-          .where(eq(customers.pharmacyId, pharmacyId))
-          .orderBy(desc(customers.updatedAt))
-          .limit(30);
-        return NextResponse.json(list);
-      }
-
-      const list = await db
-        .select()
-        .from(customers)
-        .where(
-          and(
-            eq(customers.pharmacyId, pharmacyId),
-            or(
-              ilike(customers.name, `%${query}%`),
-              ilike(customers.phone, `%${query}%`)
+          .where(
+            and(
+              eq(customers.pharmacyId, pharmacyId),
+              or(
+                ilike(customers.name, `%${query}%`),
+                ilike(customers.phone, `%${query}%`)
+              )
             )
           )
-        )
-        .limit(20);
+          .limit(20);
 
-      return NextResponse.json(list);
-    } catch {
-      // Offline fallback scoped to pharmacy
-      const list = offlineStore.getCustomers(pharmacyId);
-      if (!query) return NextResponse.json(list);
-      const q = query.toLowerCase();
-      const filtered = list.filter(
-        (c) => c.name.toLowerCase().includes(q) || c.phone.includes(q)
-      );
-      return NextResponse.json(filtered);
+        return NextResponse.json(list);
+      } catch {
+        // Fallback to offline store
+      }
     }
+
+    // Offline fallback scoped to pharmacy
+    const list = offlineStore.getCustomers(pharmacyId);
+    if (!query) return NextResponse.json(list);
+    const q = query.toLowerCase();
+    const filtered = list.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.phone.includes(q)
+    );
+    return NextResponse.json(filtered);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -74,26 +78,30 @@ export async function POST(request: Request) {
       );
     }
 
-    try {
-      const [newCustomer] = await db
-        .insert(customers)
-        .values({
-          pharmacyId,
-          name: name.trim(),
-          phone: phone.trim(),
-          pendingCredit: (initialCredit || 0).toString(),
-        })
-        .returning();
+    if (isDbConfigured) {
+      try {
+        const [newCustomer] = await db
+          .insert(customers)
+          .values({
+            pharmacyId,
+            name: name.trim(),
+            phone: phone.trim(),
+            pendingCredit: (initialCredit || 0).toString(),
+          })
+          .returning();
 
-      return NextResponse.json(newCustomer);
-    } catch {
-      const newCust = offlineStore.addCustomer(pharmacyId, {
-        name,
-        phone,
-        pendingCredit: parseFloat(initialCredit) || 0,
-      });
-      return NextResponse.json(newCust);
+        return NextResponse.json(newCustomer);
+      } catch {
+        // Fallback to offline store
+      }
     }
+
+    const newCust = offlineStore.addCustomer(pharmacyId, {
+      name,
+      phone,
+      pendingCredit: parseFloat(initialCredit) || 0,
+    });
+    return NextResponse.json(newCust);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

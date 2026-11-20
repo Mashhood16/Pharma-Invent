@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, isDbConfigured } from "@/db";
 import { purchases, purchaseItems, suppliers, batches, medicines } from "@/db/schema";
 import { eq, gte, sql, desc, and } from "drizzle-orm";
 import { offlineStore } from "@/db/offline-store";
@@ -17,8 +17,9 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    try {
-      const now = new Date();
+    if (isDbConfigured) {
+      try {
+        const now = new Date();
       const day = now.getDay();
       const diff = now.getDate() - day + (day === 0 ? -6 : 1);
       const startOfWeek = new Date(now.setDate(diff));
@@ -69,14 +70,18 @@ export async function GET() {
         0
       );
 
-      return NextResponse.json({
-        startOfWeek: startOfWeek.toISOString(),
-        totalMoneySpentThisWeek,
-        supplierInflow,
-        weeklyPurchasesList,
-      });
-    } catch {
-      // Offline mode scoped to pharmacy
+        return NextResponse.json({
+          startOfWeek: startOfWeek.toISOString(),
+          totalMoneySpentThisWeek,
+          supplierInflow,
+          weeklyPurchasesList,
+        });
+      } catch {
+        // Fallback to offline store
+      }
+    }
+
+    // Offline mode scoped to pharmacy
       const pharmPurchases = offlineStore.getPurchases(pharmacyId);
       const totalSpent = pharmPurchases.reduce((sum, p) => sum + p.totalCost, 0);
       const supplierInflowMap: Record<string, any> = {};
@@ -102,7 +107,6 @@ export async function GET() {
         supplierInflow: Object.values(supplierInflowMap),
         weeklyPurchasesList: pharmPurchases,
       });
-    }
   } catch (error: any) {
     console.error("Weekly inflow error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -131,29 +135,33 @@ export async function POST(request: Request) {
       );
     }
 
-    try {
-      const [newPurchase] = await db
-        .insert(purchases)
-        .values({
-          pharmacyId,
-          supplierId,
-          invoiceNumber: invoiceNumber || null,
-          totalCost: (totalCost || 0).toString(),
-          amountPaid: (amountPaid || 0).toString(),
-        })
-        .returning();
+    if (isDbConfigured) {
+      try {
+        const [newPurchase] = await db
+          .insert(purchases)
+          .values({
+            pharmacyId,
+            supplierId,
+            invoiceNumber: invoiceNumber || null,
+            totalCost: (totalCost || 0).toString(),
+            amountPaid: (amountPaid || 0).toString(),
+          })
+          .returning();
 
-      return NextResponse.json(newPurchase);
-    } catch {
-      const purchase = offlineStore.addPurchase(pharmacyId, {
-        supplierId,
-        invoiceNumber,
-        totalCost: Number(totalCost) || 0,
-        amountPaid: Number(amountPaid) || 0,
-        items: items || [],
-      });
-      return NextResponse.json(purchase);
+        return NextResponse.json(newPurchase);
+      } catch {
+        // Fallback to offline store
+      }
     }
+
+    const purchase = offlineStore.addPurchase(pharmacyId, {
+      supplierId,
+      invoiceNumber,
+      totalCost: Number(totalCost) || 0,
+      amountPaid: Number(amountPaid) || 0,
+      items: items || [],
+    });
+    return NextResponse.json(purchase);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, isDbConfigured } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyPassword, createSessionToken, setAuthCookie } from "@/lib/auth";
@@ -18,46 +18,48 @@ export async function POST(request: Request) {
 
     const cleanUsername = username.trim().toLowerCase();
 
-    // 1. Try PostgreSQL Database if connected
-    try {
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.username, cleanUsername))
-        .limit(1);
+    // 1. Try PostgreSQL Database if explicitly configured
+    if (isDbConfigured) {
+      try {
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.username, cleanUsername))
+          .limit(1);
 
-      if (user) {
-        const isValid = await verifyPassword(password, user.passwordHash);
-        if (isValid) {
-          const pharm = user.pharmacyId ? offlineStore.getPharmacy(user.pharmacyId) : null;
-          const token = await createSessionToken({
-            userId: user.id,
-            name: user.name,
-            username: user.username,
-            role: user.role as any,
-            pharmacyId: user.pharmacyId,
-            pharmacyName: pharm?.name || null,
-          });
-          await setAuthCookie(token);
-
-          const redirectTo = user.role === "SUPER_ADMIN" ? "/super-admin" : "/pos";
-
-          return NextResponse.json({
-            success: true,
-            user: {
-              id: user.id,
+        if (user) {
+          const isValid = await verifyPassword(password, user.passwordHash);
+          if (isValid) {
+            const pharm = user.pharmacyId ? offlineStore.getPharmacy(user.pharmacyId) : null;
+            const token = await createSessionToken({
+              userId: user.id,
               name: user.name,
               username: user.username,
-              role: user.role,
+              role: user.role as any,
               pharmacyId: user.pharmacyId,
               pharmacyName: pharm?.name || null,
-            },
-            redirectTo,
-          });
+            });
+            await setAuthCookie(token);
+
+            const redirectTo = user.role === "SUPER_ADMIN" ? "/super-admin" : "/pos";
+
+            return NextResponse.json({
+              success: true,
+              user: {
+                id: user.id,
+                name: user.name,
+                username: user.username,
+                role: user.role,
+                pharmacyId: user.pharmacyId,
+                pharmacyName: pharm?.name || null,
+              },
+              redirectTo,
+            });
+          }
         }
+      } catch (err) {
+        console.warn("Postgres authentication failed, falling back to standalone store:", err);
       }
-    } catch {
-      // Postgres not available, fallback to offline store
     }
 
     // 2. Multi-Tenant Offline / Standalone Store Check
