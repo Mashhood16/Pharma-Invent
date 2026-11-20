@@ -13,6 +13,7 @@ import {
   Printer,
   AlertCircle,
   Package,
+  ShoppingCart,
 } from "lucide-react";
 import { formatCurrency, isLowStock } from "@/lib/utils";
 import {
@@ -77,6 +78,9 @@ export default function POSPage() {
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Mobile View Switcher: "catalog" vs "cart" on screens < lg
+  const [mobileView, setMobileView] = useState<"catalog" | "cart">("catalog");
 
   // Focus refs
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -376,8 +380,8 @@ export default function POSPage() {
   return (
     <div className="flex-1 flex flex-col h-full bg-zinc-950 text-zinc-100 overflow-hidden font-sans">
       {/* Top POS Action Toolbar */}
-      <div className="h-11 bg-zinc-900 border-b border-zinc-800 px-3 flex items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-3 flex-1">
+      <div className="min-h-11 py-1.5 px-3 bg-zinc-900 border-b border-zinc-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-2 flex-1">
           {/* Main Search Input */}
           <div className="relative flex-1 max-w-lg">
             <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-zinc-500" />
@@ -389,7 +393,7 @@ export default function POSPage() {
                 setSearchQuery(e.target.value);
                 fetchMedicines(e.target.value);
               }}
-              placeholder="Search Brand Name, Generic Formula, or scan Barcode... [F1]"
+              placeholder="Search Brand Name, Formula, Barcode... [F1]"
               className="w-full bg-zinc-950 border border-zinc-800 rounded pl-8 pr-12 py-1.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600 font-medium"
             />
             <kbd className="absolute right-2 top-2 text-[9px] font-mono bg-zinc-800 border border-zinc-700 text-zinc-400 px-1 py-0.2 rounded">
@@ -401,7 +405,7 @@ export default function POSPage() {
           <div className="relative">
             <button
               onClick={() => setShowCustomerDropdown(!showCustomerDropdown)}
-              className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded text-xs border border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-300 transition-colors"
+              className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded text-xs border border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-300 transition-colors whitespace-nowrap"
             >
               <User className="w-3.5 h-3.5 text-zinc-400" />
               <span>{selectedCustomer ? selectedCustomer.name : "Walk-in Cash [F2]"}</span>
@@ -473,10 +477,47 @@ export default function POSPage() {
         </div>
       </div>
 
+      {/* Mobile Segmented View Switcher (< lg screens) */}
+      <div className="lg:hidden flex items-center bg-zinc-900 border-b border-zinc-800 p-1 text-xs shrink-0">
+        <button
+          type="button"
+          onClick={() => setMobileView("catalog")}
+          className={`flex-1 py-1.5 px-2 rounded font-medium flex items-center justify-center gap-1.5 transition-colors ${
+            mobileView === "catalog"
+              ? "bg-zinc-800 text-white font-semibold shadow-sm"
+              : "text-zinc-400 hover:text-zinc-200"
+          }`}
+        >
+          <Package className="w-3.5 h-3.5" />
+          <span>Catalog ({searchResults.length})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileView("cart")}
+          className={`flex-1 py-1.5 px-2 rounded font-medium flex items-center justify-center gap-1.5 transition-colors ${
+            mobileView === "cart"
+              ? "bg-emerald-600 text-white font-semibold shadow-sm"
+              : "text-zinc-400 hover:text-zinc-200"
+          }`}
+        >
+          <ShoppingCart className="w-3.5 h-3.5" />
+          <span>Cart ({cart.length})</span>
+          {cart.length > 0 && (
+            <span className="font-mono text-[11px] font-bold bg-black/30 px-1.5 py-0.2 rounded ml-1">
+              {formatCurrency(totalAmount)}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Main POS Split Screen */}
       <div className="flex-1 grid grid-cols-12 overflow-hidden">
         {/* Left 7 Columns: Medicine Catalog */}
-        <div className="col-span-12 lg:col-span-7 border-r border-zinc-800 flex flex-col bg-zinc-950 overflow-hidden">
+        <div
+          className={`col-span-12 lg:col-span-7 border-r border-zinc-800 flex flex-col bg-zinc-950 overflow-hidden ${
+            mobileView === "cart" ? "hidden lg:flex" : "flex"
+          }`}
+        >
           <div className="h-8 px-3 bg-zinc-900/60 border-b border-zinc-800 flex items-center justify-between text-[11px] text-zinc-400">
             <span>Product Catalog ({searchResults.length})</span>
             <span>Click "+ Box" or "+ Tab" to add</span>
@@ -559,9 +600,9 @@ export default function POSPage() {
                         return (
                           <div
                             key={batch.id}
-                            className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-950 border border-zinc-850"
+                            className="flex flex-col sm:flex-row sm:items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-950 border border-zinc-850 gap-2"
                           >
-                            <div className="flex items-center space-x-3">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                               <span className="font-mono text-zinc-300 font-medium">
                                 Batch: {batch.batchNumber}
                               </span>
@@ -573,20 +614,20 @@ export default function POSPage() {
                               </span>
                             </div>
 
-                            <div className="flex items-center space-x-3">
+                            <div className="flex items-center justify-between sm:justify-end gap-2">
                               <span className="font-mono text-zinc-200 font-medium text-[11px]">
                                 {formatCurrency(boxRate)}/box ({formatCurrency(unitRate)}/tab)
                               </span>
-                              <div className="flex space-x-1">
+                              <div className="flex space-x-1 shrink-0">
                                 <button
                                   onClick={() => addItemToCart(med, batch, "BOX")}
-                                  className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[10px] font-medium border border-zinc-700"
+                                  className="px-2.5 py-1 sm:py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-zinc-200 text-xs sm:text-[10px] font-medium border border-zinc-700"
                                 >
                                   + Box
                                 </button>
                                 <button
                                   onClick={() => addItemToCart(med, batch, "UNIT")}
-                                  className="px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-[10px] border border-zinc-800"
+                                  className="px-2.5 py-1 sm:py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 active:bg-zinc-700 text-zinc-400 hover:text-zinc-200 text-xs sm:text-[10px] border border-zinc-800"
                                 >
                                   + Tab
                                 </button>
@@ -604,7 +645,11 @@ export default function POSPage() {
         </div>
 
         {/* Right 5 Columns: Active Cart & Checkout in PKR */}
-        <div className="col-span-12 lg:col-span-5 flex flex-col bg-zinc-900/30">
+        <div
+          className={`col-span-12 lg:col-span-5 flex flex-col bg-zinc-900/30 overflow-hidden ${
+            mobileView === "catalog" ? "hidden lg:flex" : "flex"
+          }`}
+        >
           <div className="h-8 px-3 bg-zinc-900 border-b border-zinc-800 flex justify-between items-center text-xs">
             <span className="font-medium text-zinc-200">
               Active Sale ({cart.length} items)
@@ -827,6 +872,18 @@ export default function POSPage() {
           </div>
         </div>
       </div>
+
+      {/* Floating Cart Button for Mobile when in Catalog View */}
+      {mobileView === "catalog" && cart.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setMobileView("cart")}
+          className="lg:hidden fixed bottom-16 right-4 z-40 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-semibold text-xs py-2.5 px-4 rounded-full shadow-xl shadow-black/80 flex items-center gap-2 border border-emerald-400/40 transition-all"
+        >
+          <ShoppingCart className="w-4 h-4" />
+          <span>View Cart ({cart.length}) • {formatCurrency(totalAmount)}</span>
+        </button>
+      )}
 
       {/* Receipt Modal */}
       <ThermalReceiptModal

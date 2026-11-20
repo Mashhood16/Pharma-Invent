@@ -6,6 +6,7 @@ import { DesktopTitlebar } from "@/components/desktop/titlebar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { AIAssistantModal } from "@/components/ai/ai-assistant-modal";
 import { SuperAdminBanner } from "@/components/layout/super-admin-banner";
+import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { Role } from "@/lib/auth";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -22,6 +23,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     activePharmacyDsl?: string | null;
   } | null>(null);
   const [isAIOpen, setIsAIOpen] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     // Global hotkey Ctrl+K for AI Copilot
@@ -34,6 +36,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     window.addEventListener("keydown", handleGlobalKeys);
     return () => window.removeEventListener("keydown", handleGlobalKeys);
   }, []);
+
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!isLoginPage) {
@@ -66,10 +73,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100 font-sans select-none">
-      {/* 1. Professional Windows Desktop Titlebar */}
+      {/* 1. Responsive Titlebar */}
       <DesktopTitlebar
         user={user}
         onToggleAI={() => setIsAIOpen(!isAIOpen)}
+        onToggleMobileMenu={() => setMobileSidebarOpen(!mobileSidebarOpen)}
       />
 
       {/* 2. Super Admin Tenant Inspection Banner */}
@@ -82,11 +90,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       )}
 
       {/* 3. Main Workspace Layout */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Clean Enterprise Sidebar */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Responsive Desktop & Mobile Slide-out Drawer Sidebar */}
         <Sidebar
           userRole={user?.role || "ADMIN"}
           onOpenAI={() => setIsAIOpen(true)}
+          mobileOpen={mobileSidebarOpen}
+          onMobileClose={() => setMobileSidebarOpen(false)}
         />
 
         {/* Content Area */}
@@ -95,7 +105,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {/* 4. Non-intrusive AI Slide-out Drawer */}
+      {/* 4. Mobile Bottom Navigation Bar (Phone only) */}
+      <MobileBottomNav
+        userRole={user?.role || "ADMIN"}
+        onOpenMenu={() => setMobileSidebarOpen(true)}
+      />
+
+      {/* 5. Non-intrusive AI Slide-out Drawer */}
       <AIAssistantModal
         isOpen={isAIOpen}
         onClose={() => setIsAIOpen(false)}

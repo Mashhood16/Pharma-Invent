@@ -119,7 +119,7 @@ export default function CustomersKhataPage() {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-zinc-950 text-zinc-100 overflow-y-auto font-sans">
-      <div className="h-12 bg-zinc-900 border-b border-zinc-800 px-4 flex items-center justify-between shrink-0">
+      <div className="min-h-12 py-2 bg-zinc-900 border-b border-zinc-800 px-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shrink-0">
         <div className="flex items-center space-x-2">
           <Users className="w-4 h-4 text-zinc-400" />
           <h1 className="text-xs font-semibold text-zinc-100 uppercase tracking-wider">
@@ -127,7 +127,7 @@ export default function CustomersKhataPage() {
           </h1>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 self-end sm:self-auto">
           <div className="text-xs text-zinc-400">
             Total Outstanding Credit:{" "}
             <span className="font-mono font-semibold text-amber-400">
@@ -164,8 +164,8 @@ export default function CustomersKhataPage() {
             <span className="text-zinc-500 text-[11px]">Click "Add Account" to register regular patients for store credit.</span>
           </div>
         ) : (
-          <div className="border border-zinc-800 rounded overflow-hidden">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="border border-zinc-800 rounded overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse min-w-[620px]">
               <thead>
                 <tr className="bg-zinc-900 text-zinc-400 border-b border-zinc-800 text-[11px] uppercase tracking-wider font-medium">
                   <th className="py-2 px-3">Patient / Account Name</th>

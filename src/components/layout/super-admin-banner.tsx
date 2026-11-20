@@ -66,20 +66,20 @@ export function SuperAdminBanner({
   };
 
   return (
-    <div className="bg-amber-500/15 border-b border-amber-500/30 px-3 py-1 flex items-center justify-between text-xs text-amber-200 shrink-0 z-40 select-none">
-      <div className="flex items-center space-x-2">
-        <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold text-[10px] uppercase tracking-wider border border-amber-500/30">
+    <div className="bg-amber-500/15 border-b border-amber-500/30 px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 text-xs text-amber-200 shrink-0 z-40 select-none">
+      <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+        <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold text-[10px] uppercase tracking-wider border border-amber-500/30 shrink-0">
           <ShieldAlert className="w-3 h-3 text-amber-400" />
-          Super Admin Mode
+          Super Admin
         </span>
 
         <span className="text-zinc-400 hidden sm:inline text-[11px]">
-          Currently Inspecting Store:
+          Viewing Store:
         </span>
 
-        <span className="font-semibold text-zinc-100 bg-zinc-900/90 px-2 py-0.5 rounded border border-zinc-700/60 font-mono text-[11px] flex items-center gap-1.5">
-          <Building className="w-3 h-3 text-amber-400" />
-          {currentPharmacyName || "Default Pharmacy"}
+        <span className="font-semibold text-zinc-100 bg-zinc-900/90 px-2 py-0.5 rounded border border-zinc-700/60 font-mono text-[11px] flex items-center gap-1.5 max-w-[200px] sm:max-w-none truncate">
+          <Building className="w-3 h-3 text-amber-400 shrink-0" />
+          <span className="truncate">{currentPharmacyName || "Default Pharmacy"}</span>
           {currentPharmacyDsl && (
             <span className="text-zinc-500 text-[10px] hidden md:inline">
               ({currentPharmacyDsl})
@@ -88,7 +88,7 @@ export function SuperAdminBanner({
         </span>
       </div>
 
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-2 shrink-0">
         {/* Switch Pharmacy Dropdown */}
         <div className="relative">
           <button
@@ -97,12 +97,12 @@ export function SuperAdminBanner({
             className="flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 text-[11px] font-medium text-zinc-200 transition-colors shadow-sm"
           >
             <ArrowLeftRight className="w-3 h-3 text-amber-400" />
-            <span className="hidden sm:inline">Switch Store</span>
+            <span className="hidden xs:inline">Switch</span>
             <ChevronDown className="w-3 h-3 text-zinc-400" />
           </button>
 
           {isOpen && (
-            <div className="absolute right-0 mt-1 w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl py-1 z-50 divide-y divide-zinc-800 text-xs">
+            <div className="absolute right-0 mt-1 w-64 max-w-[85vw] bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl py-1 z-50 divide-y divide-zinc-800 text-xs">
               <div className="px-3 py-1.5 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
                 Select Pharmacy to Inspect
               </div>
@@ -133,10 +133,10 @@ export function SuperAdminBanner({
         {/* Exit to Super Admin Portal */}
         <button
           onClick={handleExitToPortal}
-          className="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-[11px] font-semibold text-amber-200 transition-colors"
+          className="flex items-center gap-1 px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-[11px] font-semibold text-amber-200 transition-colors"
         >
-          <LogOut className="w-3 h-3" />
-          <span>Exit to Portal</span>
+          <LogOut className="w-3 h-3 shrink-0" />
+          <span>Exit</span>
         </button>
       </div>
     </div>

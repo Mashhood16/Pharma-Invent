@@ -186,13 +186,13 @@ export default function SuperAdminPage() {
   return (
     <div className="flex-1 flex flex-col h-full bg-zinc-950 text-zinc-100 overflow-y-auto font-sans">
       {/* Top Banner */}
-      <div className="h-14 bg-zinc-900 border-b border-zinc-800 px-6 flex items-center justify-between shrink-0">
+      <div className="min-h-14 py-3 bg-zinc-900 border-b border-zinc-800 px-4 sm:px-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shrink-0">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+          <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-sm font-bold text-zinc-100 uppercase tracking-wider flex items-center gap-2">
+            <h1 className="text-sm font-bold text-zinc-100 uppercase tracking-wider flex flex-wrap items-center gap-2">
               Super Admin Control Center
               <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">
                 Multi-Tenant Platform
@@ -204,7 +204,7 @@ export default function SuperAdminPage() {
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 self-end sm:self-auto">
           <button
             onClick={() => setIsCreateModalOpen(true)}
             className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-zinc-950 font-semibold rounded text-xs flex items-center gap-1.5 transition-colors shadow-sm"
@@ -223,7 +223,7 @@ export default function SuperAdminPage() {
         </div>
       </div>
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Global Platform KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 space-y-1">
@@ -447,8 +447,8 @@ export default function SuperAdminPage() {
             )}
 
             <form onSubmit={handleCreateSubmit} className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-zinc-400 mb-1 font-medium">
                     Pharmacy Store Name *
                   </label>
@@ -515,7 +515,7 @@ export default function SuperAdminPage() {
                   />
                 </div>
 
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-zinc-400 mb-1 font-medium">Store Address *</label>
                   <input
                     type="text"
@@ -535,7 +535,7 @@ export default function SuperAdminPage() {
                   Pharmacy Admin Login Credentials
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-zinc-400 mb-1 font-medium">
                       Admin Username *

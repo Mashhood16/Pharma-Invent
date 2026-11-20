@@ -95,7 +95,7 @@ export default function FinancialsPage() {
   return (
     <div className="flex-1 flex flex-col h-full bg-zinc-950 text-zinc-100 overflow-y-auto font-sans">
       {/* Top Banner */}
-      <div className="h-12 bg-zinc-900 border-b border-zinc-800 px-4 flex items-center justify-between shrink-0">
+      <div className="min-h-12 py-2 bg-zinc-900 border-b border-zinc-800 px-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shrink-0">
         <div className="flex items-center space-x-2">
           <TrendingUp className="w-4 h-4 text-zinc-400" />
           <h1 className="text-xs font-semibold text-zinc-100 uppercase tracking-wider">
@@ -103,7 +103,7 @@ export default function FinancialsPage() {
           </h1>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 self-end sm:self-auto">
           <button
             onClick={openZReport}
             className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm"
@@ -211,8 +211,8 @@ export default function FinancialsPage() {
             Sales & Margin Audit Ledger
           </div>
 
-          <div className="border border-zinc-800 rounded overflow-hidden">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="border border-zinc-800 rounded overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse min-w-[700px]">
               <thead>
                 <tr className="bg-zinc-900 text-zinc-400 border-b border-zinc-800 text-[11px] uppercase tracking-wider font-medium">
                   <th className="py-2 px-3">Receipt #</th>
@@ -280,7 +280,7 @@ export default function FinancialsPage() {
       {/* Day-End Cash Closing (Z-Report) Modal */}
       {isZReportOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-lg max-w-md w-full p-5 space-y-4 text-xs shadow-2xl">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-lg max-w-md w-full p-4 sm:p-5 space-y-4 text-xs shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start border-b border-zinc-800 pb-2">
               <div>
                 <h3 className="font-semibold text-sm text-zinc-100 flex items-center gap-1.5">

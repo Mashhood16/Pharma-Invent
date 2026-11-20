@@ -334,7 +334,7 @@ export default function InventoryPage() {
   return (
     <div className="flex-1 flex flex-col h-full bg-zinc-950 text-zinc-100 overflow-hidden font-sans">
       {/* Action Header */}
-      <div className="h-12 bg-zinc-900 border-b border-zinc-800 px-4 flex items-center justify-between gap-3 shrink-0">
+      <div className="min-h-12 py-2 bg-zinc-900 border-b border-zinc-800 px-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shrink-0">
         <div className="flex items-center space-x-2">
           <Pill className="w-4 h-4 text-zinc-400" />
           <h1 className="text-xs font-semibold text-zinc-100 uppercase tracking-wider">
@@ -343,7 +343,7 @@ export default function InventoryPage() {
           <span className="text-zinc-500 text-xs">({medicines.length} products)</span>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             onClick={() => setIsReorderSheetOpen(true)}
             className="px-2.5 py-1 bg-amber-950/40 border border-amber-800/60 text-amber-400 hover:bg-amber-900/40 rounded text-xs font-medium flex items-center space-x-1.5 transition-colors"
@@ -384,10 +384,10 @@ export default function InventoryPage() {
       </div>
 
       {/* Filter Row with Category Dropdown */}
-      <div className="h-10 bg-zinc-900/40 border-b border-zinc-800 px-4 flex items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-2 flex-1 max-w-lg">
+      <div className="min-h-10 py-1.5 bg-zinc-900/40 border-b border-zinc-800 px-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 shrink-0">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 flex-1 max-w-xl">
           {/* Search Box */}
-          <div className="relative flex-1">
+          <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-2.5 top-2.5 w-3 h-3 text-zinc-500" />
             <input
               type="text"
@@ -418,7 +418,7 @@ export default function InventoryPage() {
 
         <button
           onClick={loadInventory}
-          className="p-1 text-zinc-400 hover:text-zinc-200"
+          className="self-end sm:self-auto p-1 text-zinc-400 hover:text-zinc-200"
           title="Refresh table"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -426,7 +426,7 @@ export default function InventoryPage() {
       </div>
 
       {/* Dense Enterprise Table */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4">
         {filteredMedicines.length === 0 ? (
           <div className="h-64 flex flex-col items-center justify-center text-zinc-500 text-xs space-y-2 border border-dashed border-zinc-800 rounded-lg">
             <Package className="w-8 h-8 stroke-1 text-zinc-600" />
@@ -436,8 +436,8 @@ export default function InventoryPage() {
             </span>
           </div>
         ) : (
-          <div className="border border-zinc-800 rounded overflow-hidden">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="border border-zinc-800 rounded overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse min-w-[760px]">
               <thead>
                 <tr className="bg-zinc-900 text-zinc-400 border-b border-zinc-800 text-[11px] uppercase tracking-wider font-medium">
                   <th className="py-2 px-3 w-8"></th>
@@ -604,7 +604,7 @@ export default function InventoryPage() {
             </h3>
 
             <form onSubmit={handleAddMedicine} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-zinc-400 mb-1 font-medium">Brand Name *</label>
                   <input
@@ -630,7 +630,7 @@ export default function InventoryPage() {
               </div>
 
               {/* Category Dropdown Menu */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-zinc-400 mb-1 font-medium">Category *</label>
                   <select
@@ -684,7 +684,7 @@ export default function InventoryPage() {
 
                 {withBatch && (
                   <div className="bg-zinc-950 border border-zinc-800 rounded p-3 space-y-3">
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <div>
                         <label className="block text-zinc-400 mb-1">Batch Number *</label>
                         <input
@@ -718,7 +718,7 @@ export default function InventoryPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <label className="block text-zinc-400 mb-1">Supplier / Distributor</label>
                         <select
@@ -746,7 +746,7 @@ export default function InventoryPage() {
                     </div>
 
                     {/* Crucial Pricing Fields: Buy/Box, Sell/Box, Sell/Tab in PKR */}
-                    <div className="grid grid-cols-3 gap-2 pt-1 border-t border-zinc-850">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-zinc-850">
                       <div>
                         <label className="block text-zinc-300 font-medium mb-1">Buy / Box (PKR)</label>
                         <input
@@ -829,8 +829,8 @@ export default function InventoryPage() {
       {/* Distributor Reorder Sheet Modal */}
       {isReorderSheetOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-lg max-w-2xl w-full p-5 space-y-4 text-xs shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-start border-b border-zinc-800 pb-2">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-lg max-w-2xl w-full p-4 sm:p-5 space-y-4 text-xs shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-zinc-800 pb-2">
               <div>
                 <h3 className="font-semibold text-sm text-zinc-100 flex items-center gap-1.5">
                   <FileText className="w-4 h-4 text-amber-400" />
@@ -841,7 +841,7 @@ export default function InventoryPage() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 self-end sm:self-auto">
                 <button
                   onClick={handleCopyWhatsApp}
                   className="px-2.5 py-1 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-800 text-emerald-300 rounded font-medium flex items-center gap-1 transition-colors"
@@ -873,8 +873,8 @@ export default function InventoryPage() {
                 All inventory is sufficiently stocked. No items currently require reordering.
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto border border-zinc-800 rounded">
-                <table className="w-full text-left text-xs border-collapse">
+              <div className="flex-1 overflow-auto border border-zinc-800 rounded">
+                <table className="w-full text-left text-xs border-collapse min-w-[580px]">
                   <thead>
                     <tr className="bg-zinc-950 text-zinc-400 border-b border-zinc-800 text-[11px] uppercase tracking-wider font-medium">
                       <th className="py-2 px-3">#</th>
@@ -1018,8 +1018,8 @@ export default function InventoryPage() {
                   </span>
                 </div>
 
-                <div className="flex-1 overflow-y-auto border border-zinc-800 rounded bg-zinc-950">
-                  <table className="w-full text-left text-xs border-collapse">
+                <div className="flex-1 overflow-auto border border-zinc-800 rounded bg-zinc-950">
+                  <table className="w-full text-left text-xs border-collapse min-w-[720px]">
                     <thead>
                       <tr className="bg-zinc-900 text-zinc-400 border-b border-zinc-800 text-[10px] uppercase font-medium">
                         <th className="py-1.5 px-2.5">#</th>

@@ -52,7 +52,7 @@ export default function SettingsPage() {
   return (
     <div className="flex-1 flex flex-col h-full bg-zinc-950 text-zinc-100 overflow-y-auto font-sans">
       {/* Top Header */}
-      <div className="h-12 bg-zinc-900 border-b border-zinc-800 px-4 flex items-center justify-between shrink-0">
+      <div className="min-h-12 py-2 bg-zinc-900 border-b border-zinc-800 px-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shrink-0">
         <div className="flex items-center space-x-2">
           <Settings className="w-4 h-4 text-zinc-400" />
           <h1 className="text-xs font-semibold text-zinc-100 uppercase tracking-wider">
@@ -61,7 +61,7 @@ export default function SettingsPage() {
         </div>
 
         {saved && (
-          <div className="flex items-center space-x-1.5 text-xs text-emerald-400 font-medium">
+          <div className="flex items-center space-x-1.5 text-xs text-emerald-400 font-medium self-end sm:self-auto">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
             <span>Settings Saved Successfully!</span>
           </div>
@@ -110,7 +110,7 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-zinc-400 mb-1">Phone / WhatsApp</label>
                 <input
@@ -153,7 +153,7 @@ export default function SettingsPage() {
 
             <div>
               <label className="block text-zinc-400 mb-1">Default Paper Roll Width</label>
-              <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <label className="flex items-center space-x-2 text-zinc-300 cursor-pointer">
                   <input
                     type="radio"

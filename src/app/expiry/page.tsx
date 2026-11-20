@@ -162,8 +162,8 @@ export default function ExpiryPage() {
 
         {/* Expired Batches Table */}
         {activeTab === "EXPIRED" && (
-          <div className="border border-zinc-800 rounded overflow-hidden">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="border border-zinc-800 rounded overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse min-w-[700px]">
               <thead>
                 <tr className="bg-zinc-900 text-zinc-400 border-b border-zinc-800 text-[11px] uppercase tracking-wider font-medium">
                   <th className="py-2 px-3">Medicine & Formula</th>
@@ -234,8 +234,8 @@ export default function ExpiryPage() {
 
         {/* Near Expiry Table */}
         {activeTab === "NEAR" && (
-          <div className="border border-zinc-800 rounded overflow-hidden">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="border border-zinc-800 rounded overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse min-w-[620px]">
               <thead>
                 <tr className="bg-zinc-900 text-zinc-400 border-b border-zinc-800 text-[11px] uppercase tracking-wider font-medium">
                   <th className="py-2 px-3">Medicine</th>

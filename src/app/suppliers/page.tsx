@@ -107,7 +107,7 @@ export default function SuppliersPage() {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-zinc-950 text-zinc-100 overflow-y-auto font-sans">
-      <div className="h-12 bg-zinc-900 border-b border-zinc-800 px-4 flex justify-between items-center shrink-0">
+      <div className="min-h-12 py-2 bg-zinc-900 border-b border-zinc-800 px-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shrink-0">
         <div className="flex items-center space-x-2">
           <Building2 className="w-4 h-4 text-zinc-400" />
           <h1 className="text-xs font-semibold text-zinc-100 uppercase tracking-wider">
@@ -117,7 +117,7 @@ export default function SuppliersPage() {
 
         <button
           onClick={() => setIsAddOpen(true)}
-          className="px-3 py-1 bg-zinc-100 hover:bg-white text-zinc-950 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors"
+          className="self-end sm:self-auto px-3 py-1 bg-zinc-100 hover:bg-white text-zinc-950 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>Add Supplier</span>
@@ -132,8 +132,8 @@ export default function SuppliersPage() {
             <span className="text-zinc-500 text-[11px]">Click "Add Supplier" to add wholesale pharmaceutical distributors.</span>
           </div>
         ) : (
-          <div className="border border-zinc-800 rounded overflow-hidden">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="border border-zinc-800 rounded overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse min-w-[560px]">
               <thead>
                 <tr className="bg-zinc-900 text-zinc-400 border-b border-zinc-800 text-[11px] uppercase tracking-wider font-medium">
                   <th className="py-2 px-3">Supplier Name</th>
