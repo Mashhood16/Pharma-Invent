@@ -27,9 +27,20 @@ async function runSeed() {
     await db.delete(schema.suppliers).execute().catch(() => {});
     await db.delete(schema.users).execute().catch(() => {});
 
-    console.log("👤 Creating Admin and Cashier users...");
+    console.log("👤 Creating Super Admin, Admin, and Cashier users...");
+    const superAdminHash = await bcrypt.hash("superadmin123", 10);
     const adminHash = await bcrypt.hash("admin123", 10);
     const cashierHash = await bcrypt.hash("cashier123", 10);
+
+    const [superAdminUser] = await db
+      .insert(schema.users)
+      .values({
+        name: "Master Super Admin (Platform Owner)",
+        username: "superadmin",
+        role: "SUPER_ADMIN" as any,
+        passwordHash: superAdminHash,
+      })
+      .returning();
 
     const [adminUser] = await db
       .insert(schema.users)
