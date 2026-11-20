@@ -2,7 +2,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
-const rawDbUrl = process.env.DATABASE_URL?.trim();
+const rawDbUrl = (process.env.DATABASE_URL || process.env.POSTGRES_URL)?.trim();
 
 // A real database is configured if DATABASE_URL is provided and not pointing to localhost on Vercel
 const isLocalhost =
