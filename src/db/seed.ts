@@ -26,6 +26,21 @@ async function runSeed() {
     await db.delete(schema.medicines).execute().catch(() => {});
     await db.delete(schema.suppliers).execute().catch(() => {});
     await db.delete(schema.users).execute().catch(() => {});
+    await db.delete(schema.pharmacies).execute().catch(() => {});
+
+    console.log("🏥 Creating Default Primary Pharmacy (Tenant)...");
+    const [defaultPharm] = await db
+      .insert(schema.pharmacies)
+      .values({
+        name: "Al-Shifa Community Pharmacy",
+        dslNumber: "DSL-PK-2026-0811",
+        ntn: "NTN-7819201-4",
+        ownerName: "Dr. Hamza Siddiqui",
+        phone: "+92 300 1234567",
+        address: "Shop # 1, Main Market, Lahore, Pakistan",
+        status: "ACTIVE",
+      })
+      .returning();
 
     console.log("👤 Creating Super Admin, Admin, and Cashier users...");
     const superAdminHash = await bcrypt.hash("superadmin123", 10);
@@ -39,6 +54,7 @@ async function runSeed() {
         username: "superadmin",
         role: "SUPER_ADMIN" as any,
         passwordHash: superAdminHash,
+        pharmacyId: null,
       })
       .returning();
 
@@ -49,6 +65,7 @@ async function runSeed() {
         username: "admin",
         role: "ADMIN",
         passwordHash: adminHash,
+        pharmacyId: defaultPharm.id,
       })
       .returning();
 
@@ -59,6 +76,7 @@ async function runSeed() {
         username: "cashier",
         role: "CASHIER",
         passwordHash: cashierHash,
+        pharmacyId: defaultPharm.id,
       })
       .returning();
 
@@ -67,21 +85,25 @@ async function runSeed() {
       .insert(schema.suppliers)
       .values([
         {
+          pharmacyId: defaultPharm.id,
           name: "GSK Healthcare Distribution",
           contactInfo: "Phone: +1 800-475-2345 | Email: supply@gskdist.com",
           ledgerBalance: "1250.00",
         },
         {
+          pharmacyId: defaultPharm.id,
           name: "Abbott Laboratories Supply",
           contactInfo: "Phone: +1 800-222-6880 | Email: orders@abbottpharma.com",
           ledgerBalance: "480.00",
         },
         {
+          pharmacyId: defaultPharm.id,
           name: "Pfizer Regional Depot",
           contactInfo: "Phone: +1 800-734-9371 | Email: logistics@pfizerdist.com",
           ledgerBalance: "0.00",
         },
         {
+          pharmacyId: defaultPharm.id,
           name: "Searle Pharmaceuticals",
           contactInfo: "Phone: +1 800-555-9123 | Email: orders@searle.com",
           ledgerBalance: "3200.50",
@@ -99,6 +121,7 @@ async function runSeed() {
       .insert(schema.medicines)
       .values([
         {
+          pharmacyId: defaultPharm.id,
           brandName: "Panadol 500mg",
           genericFormula: "Paracetamol",
           category: "Analgesic / Antipyretic",
@@ -106,6 +129,7 @@ async function runSeed() {
           reorderLevel: 2,
         },
         {
+          pharmacyId: defaultPharm.id,
           brandName: "Calpol 250mg Suspension",
           genericFormula: "Paracetamol",
           category: "Pediatric Analgesic",
@@ -113,6 +137,7 @@ async function runSeed() {
           reorderLevel: 2,
         },
         {
+          pharmacyId: defaultPharm.id,
           brandName: "Disprol 500mg",
           genericFormula: "Paracetamol",
           category: "Analgesic",
@@ -120,6 +145,7 @@ async function runSeed() {
           reorderLevel: 2,
         },
         {
+          pharmacyId: defaultPharm.id,
           brandName: "Augmentin 625mg",
           genericFormula: "Amoxicillin + Clavulanic Acid",
           category: "Broad Spectrum Antibiotic",
@@ -127,6 +153,7 @@ async function runSeed() {
           reorderLevel: 2,
         },
         {
+          pharmacyId: defaultPharm.id,
           brandName: "Amoxil 500mg",
           genericFormula: "Amoxicillin",
           category: "Antibiotic",
@@ -134,6 +161,7 @@ async function runSeed() {
           reorderLevel: 2,
         },
         {
+          pharmacyId: defaultPharm.id,
           brandName: "Brufen 400mg",
           genericFormula: "Ibuprofen",
           category: "NSAID Anti-inflammatory",
@@ -141,6 +169,7 @@ async function runSeed() {
           reorderLevel: 2,
         },
         {
+          pharmacyId: defaultPharm.id,
           brandName: "Arinac Forte",
           genericFormula: "Ibuprofen + Pseudoephedrine",
           category: "Cold & Sinus Relief",
@@ -148,6 +177,7 @@ async function runSeed() {
           reorderLevel: 2,
         },
         {
+          pharmacyId: defaultPharm.id,
           brandName: "Risek 20mg",
           genericFormula: "Omeprazole",
           category: "Proton Pump Inhibitor (Gastro)",
@@ -155,6 +185,7 @@ async function runSeed() {
           reorderLevel: 2,
         },
         {
+          pharmacyId: defaultPharm.id,
           brandName: "Nexum 40mg",
           genericFormula: "Esomeprazole",
           category: "Proton Pump Inhibitor (Gastro)",
@@ -162,6 +193,7 @@ async function runSeed() {
           reorderLevel: 2,
         },
         {
+          pharmacyId: defaultPharm.id,
           brandName: "Loprin 75mg",
           genericFormula: "Aspirin",
           category: "Cardiovascular Antiplatelet",
@@ -169,6 +201,7 @@ async function runSeed() {
           reorderLevel: 2,
         },
         {
+          pharmacyId: defaultPharm.id,
           brandName: "Glucophage 500mg",
           genericFormula: "Metformin HCl",
           category: "Antidiabetic",
@@ -323,21 +356,25 @@ async function runSeed() {
       .insert(schema.customers)
       .values([
         {
+          pharmacyId: defaultPharm.id,
           name: "Muhammad Tariq (Regular Patient)",
           phone: "+1 555-010-9921",
           pendingCredit: "45.50",
         },
         {
+          pharmacyId: defaultPharm.id,
           name: "Zainab Bibi",
           phone: "+1 555-014-8832",
           pendingCredit: "120.00",
         },
         {
+          pharmacyId: defaultPharm.id,
           name: "Dr. Kamran Clinic Account",
           phone: "+1 555-019-3341",
           pendingCredit: "350.00",
         },
         {
+          pharmacyId: defaultPharm.id,
           name: "Walk-in Cash Customer",
           phone: "000-000-0000",
           pendingCredit: "0.00",
@@ -354,6 +391,7 @@ async function runSeed() {
     const sale1 = await db
       .insert(schema.sales)
       .values({
+        pharmacyId: defaultPharm.id,
         receiptNumber: "REC-20261110-001",
         userId: cashierUser.id,
         customerId: insertedCustomers[0].id,
@@ -388,6 +426,7 @@ async function runSeed() {
     const sale2 = await db
       .insert(schema.sales)
       .values({
+        pharmacyId: defaultPharm.id,
         receiptNumber: "REC-20261109-002",
         userId: cashierUser.id,
         customerId: insertedCustomers[1].id,
@@ -411,6 +450,7 @@ async function runSeed() {
     const purchaseThisWeek = await db
       .insert(schema.purchases)
       .values({
+        pharmacyId: defaultPharm.id,
         supplierId: gsk.id,
         invoiceNumber: "INV-GSK-88210",
         totalCost: "900.00",
@@ -428,9 +468,11 @@ async function runSeed() {
     });
 
     console.log("✅ Seed completed successfully!");
+    console.log(`🏥 Primary Pharmacy: ${defaultPharm.name} (${defaultPharm.id})`);
     console.log("Default credentials:");
-    console.log("  Admin:   username = 'admin'   / password = 'admin123'");
-    console.log("  Cashier: username = 'cashier' / password = 'cashier123'");
+    console.log("  Super Admin: username = 'superadmin' / password = 'superadmin123'");
+    console.log("  Admin:       username = 'admin'      / password = 'admin123'");
+    console.log("  Cashier:     username = 'cashier'    / password = 'cashier123'");
   } catch (error) {
     console.error("❌ Seed error:", error);
   } finally {

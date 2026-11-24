@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
 import { offlineStore } from "@/db/offline-store";
+import { db, isDbConfigured } from "@/db";
+import { pharmacies } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -9,15 +12,27 @@ export async function GET() {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }
 
-  let activePharmacy = null;
-  if (user.role === "SUPER_ADMIN") {
-    const cookieStore = await cookies();
-    const activeId = cookieStore.get("pharma_active_tenant")?.value;
-    if (activeId) {
-      activePharmacy = offlineStore.getPharmacy(activeId);
+  let activePharmacy: any = null;
+  const cookieStore = await cookies();
+  const activeId = cookieStore.get("pharma_active_tenant")?.value;
+  const targetId = user.role === "SUPER_ADMIN" ? activeId : user.pharmacyId;
+
+  if (targetId) {
+    if (isDbConfigured) {
+      try {
+        const [dbPharm] = await db
+          .select()
+          .from(pharmacies)
+          .where(eq(pharmacies.id, targetId))
+          .limit(1);
+        if (dbPharm) {
+          activePharmacy = dbPharm;
+        }
+      } catch {}
     }
-  } else if (user.pharmacyId) {
-    activePharmacy = offlineStore.getPharmacy(user.pharmacyId);
+    if (!activePharmacy) {
+      activePharmacy = offlineStore.getPharmacy(targetId);
+    }
   }
 
   return NextResponse.json({

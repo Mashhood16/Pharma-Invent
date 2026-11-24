@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
 import { offlineStore } from "@/db/offline-store";
+import { db, isDbConfigured } from "@/db";
+import { pharmacies } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function POST(request: Request) {
   try {
@@ -18,7 +21,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Pharmacy ID is required." }, { status: 400 });
     }
 
-    const pharmacy = offlineStore.getPharmacy(pharmacyId);
+    let pharmacy: any = null;
+    if (isDbConfigured) {
+      try {
+        const [dbPharm] = await db
+          .select()
+          .from(pharmacies)
+          .where(eq(pharmacies.id, pharmacyId))
+          .limit(1);
+        if (dbPharm) pharmacy = dbPharm;
+      } catch {}
+    }
+    if (!pharmacy) {
+      pharmacy = offlineStore.getPharmacy(pharmacyId);
+    }
+
     if (!pharmacy) {
       return NextResponse.json({ error: "Pharmacy not found." }, { status: 404 });
     }

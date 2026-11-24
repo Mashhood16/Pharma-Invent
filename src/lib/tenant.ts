@@ -1,12 +1,47 @@
 import { cookies } from "next/headers";
 import { getCurrentUser, SessionPayload } from "@/lib/auth";
 import { offlineStore, OfflinePharmacy } from "@/db/offline-store";
+import { db, isDbConfigured } from "@/db";
+import { pharmacies, users } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 export interface ResolvedTenant {
   user: SessionPayload;
   pharmacyId: string;
   pharmacy: OfflinePharmacy;
   isSuperAdmin: boolean;
+}
+
+async function getPharmacyRecord(pharmacyId: string): Promise<OfflinePharmacy | null> {
+  if (isDbConfigured) {
+    try {
+      const [dbPharm] = await db
+        .select()
+        .from(pharmacies)
+        .where(eq(pharmacies.id, pharmacyId))
+        .limit(1);
+
+      if (dbPharm) {
+        return {
+          id: dbPharm.id,
+          name: dbPharm.name,
+          dslNumber: dbPharm.dslNumber,
+          ntn: dbPharm.ntn || undefined,
+          ownerName: dbPharm.ownerName,
+          phone: dbPharm.phone,
+          address: dbPharm.address,
+          status: dbPharm.status as "ACTIVE" | "SUSPENDED",
+          createdAt: dbPharm.createdAt.toISOString(),
+          updatedAt: dbPharm.updatedAt.toISOString(),
+        };
+      }
+    } catch (err) {
+      console.warn("Could not query pharmacy from Postgres:", err);
+    }
+  }
+
+  const localPharm = offlineStore.getPharmacy(pharmacyId);
+  return localPharm || null;
 }
 
 export async function resolveTenant(): Promise<
@@ -25,21 +60,35 @@ export async function resolveTenant(): Promise<
 
     let targetPharmacyId = activeTenantId;
 
-    // If no tenant selected yet, check if any pharmacy exists and default to the first one, or allow inspection
+    // If no tenant selected yet, check if any pharmacy exists and default to the first one
     if (!targetPharmacyId) {
-      const firstPharm = offlineStore.pharmacies[0];
-      if (firstPharm) {
-        targetPharmacyId = firstPharm.id;
-      } else {
-        return {
-          success: false,
-          error: "No pharmacy accounts registered yet. Please create a pharmacy from the Super Admin Portal.",
-          status: 400,
-        };
+      if (isDbConfigured) {
+        try {
+          const [firstDbPharm] = await db
+            .select()
+            .from(pharmacies)
+            .limit(1);
+          if (firstDbPharm) {
+            targetPharmacyId = firstDbPharm.id;
+          }
+        } catch {}
+      }
+
+      if (!targetPharmacyId) {
+        const firstPharm = offlineStore.pharmacies[0];
+        if (firstPharm) {
+          targetPharmacyId = firstPharm.id;
+        } else {
+          return {
+            success: false,
+            error: "No pharmacy accounts registered yet. Please create a pharmacy from the Super Admin Portal.",
+            status: 400,
+          };
+        }
       }
     }
 
-    const pharmacy = offlineStore.getPharmacy(targetPharmacyId);
+    const pharmacy = await getPharmacyRecord(targetPharmacyId);
     if (!pharmacy) {
       return {
         success: false,
@@ -60,7 +109,39 @@ export async function resolveTenant(): Promise<
   }
 
   // 2. If Pharmacy User (ADMIN or CASHIER)
-  if (!user.pharmacyId) {
+  let effectivePharmacyId = user.pharmacyId;
+
+  // Auto-heal if session token has pharmacyId === null (e.g. legacy/old token or unassigned admin)
+  if (!effectivePharmacyId) {
+    if (isDbConfigured) {
+      try {
+        const [firstPharm] = await db
+          .select()
+          .from(pharmacies)
+          .where(eq(pharmacies.status, "ACTIVE"))
+          .limit(1);
+        if (firstPharm) {
+          effectivePharmacyId = firstPharm.id;
+          await db
+            .update(users)
+            .set({ pharmacyId: firstPharm.id })
+            .where(eq(users.id, user.userId))
+            .catch(() => {});
+        }
+      } catch {}
+    }
+
+    if (!effectivePharmacyId) {
+      const firstLocal =
+        offlineStore.pharmacies.find((p) => p.status === "ACTIVE") ||
+        offlineStore.pharmacies[0];
+      if (firstLocal) {
+        effectivePharmacyId = firstLocal.id;
+      }
+    }
+  }
+
+  if (!effectivePharmacyId) {
     return {
       success: false,
       error: "User is not linked to any pharmacy account.",
@@ -68,7 +149,7 @@ export async function resolveTenant(): Promise<
     };
   }
 
-  const pharmacy = offlineStore.getPharmacy(user.pharmacyId);
+  const pharmacy = await getPharmacyRecord(effectivePharmacyId);
   if (!pharmacy) {
     return {
       success: false,
@@ -89,7 +170,7 @@ export async function resolveTenant(): Promise<
     success: true,
     tenant: {
       user,
-      pharmacyId: user.pharmacyId,
+      pharmacyId: effectivePharmacyId,
       pharmacy,
       isSuperAdmin: false,
     },

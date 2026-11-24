@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, isDbConfigured } from "@/db";
-import { users } from "@/db/schema";
+import { users, pharmacies } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyPassword, createSessionToken, setAuthCookie } from "@/lib/auth";
 import { offlineStore } from "@/db/offline-store";
@@ -30,14 +30,54 @@ export async function POST(request: Request) {
         if (user) {
           const isValid = await verifyPassword(password, user.passwordHash);
           if (isValid) {
-            const pharm = user.pharmacyId ? offlineStore.getPharmacy(user.pharmacyId) : null;
+            let activePharmacyId = user.pharmacyId;
+            let pharmacyName: string | null = null;
+
+            if (user.role !== "SUPER_ADMIN") {
+              // If user has no pharmacyId (e.g. legacy/old user), auto-link to first active pharmacy
+              if (!activePharmacyId) {
+                const [firstPharm] = await db
+                  .select()
+                  .from(pharmacies)
+                  .where(eq(pharmacies.status, "ACTIVE"))
+                  .limit(1);
+                if (firstPharm) {
+                  activePharmacyId = firstPharm.id;
+                  pharmacyName = firstPharm.name;
+                  await db
+                    .update(users)
+                    .set({ pharmacyId: firstPharm.id })
+                    .where(eq(users.id, user.id))
+                    .catch(() => {});
+                }
+              } else {
+                const [pharm] = await db
+                  .select()
+                  .from(pharmacies)
+                  .where(eq(pharmacies.id, activePharmacyId))
+                  .limit(1);
+                if (pharm) {
+                  if (pharm.status === "SUSPENDED") {
+                    return NextResponse.json(
+                      {
+                        error:
+                          "This pharmacy account is currently suspended. Please contact the platform Super Admin.",
+                      },
+                      { status: 403 }
+                    );
+                  }
+                  pharmacyName = pharm.name;
+                }
+              }
+            }
+
             const token = await createSessionToken({
               userId: user.id,
               name: user.name,
               username: user.username,
               role: user.role as any,
-              pharmacyId: user.pharmacyId,
-              pharmacyName: pharm?.name || null,
+              pharmacyId: activePharmacyId,
+              pharmacyName: pharmacyName,
             });
             await setAuthCookie(token);
 
@@ -50,8 +90,8 @@ export async function POST(request: Request) {
                 name: user.name,
                 username: user.username,
                 role: user.role,
-                pharmacyId: user.pharmacyId,
-                pharmacyName: pharm?.name || null,
+                pharmacyId: activePharmacyId,
+                pharmacyName: pharmacyName,
               },
               redirectTo,
             });
